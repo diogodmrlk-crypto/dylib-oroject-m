@@ -1,88 +1,156 @@
 #import <UIKit/UIKit.h>
 #import <Foundation/Foundation.h>
-#import <CoreGraphics/CoreGraphics.h>
+#import <QuartzCore/QuartzCore.h>
 
-// Variáveis globais
 static UIWindow *PPOverlayWindow;
 static BOOL isAimbotEnabled = NO;
-
-// Declaração da função do Roblox (o offset precisa ser atualizado no futuro)
-// Aqui você puxaria a função real do Roblox via hook, mas pra testar, vamos usar a lógica base.
+static UIView *fovCircleView = nil;
 
 @interface PPPanelViewController : UIViewController <UIGestureRecognizerDelegate>
 @property (nonatomic, strong) UIView *card;
+@property (nonatomic, strong) UIView *header;
+@property (nonatomic, strong) UILabel *statusLabel;
+@property (nonatomic, strong) UIButton *aimbotBtn;
+@property (nonatomic, strong) UIView *fovSliderBg;
+@property (nonatomic, strong) UIView *fovSliderThumb;
 @end
 
 @implementation PPPanelViewController
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    self.view.backgroundColor = [UIColor clearColor];
+    self.view.backgroundColor = UIColor.clearColor;
 
-    // O Painel Quadrado
+    // 1. PAINEL PRINCIPAL (Arrastável)
     self.card = [UIView new];
     self.card.translatesAutoresizingMaskIntoConstraints = NO;
-    self.card.backgroundColor = [UIColor colorWithRed:0.075 green:0.055 blue:0.11 alpha:0.95];
-    self.card.layer.cornerRadius = 12;
+    self.card.backgroundColor = [UIColor colorWithRed:0.06 green:0.04 blue:0.10 alpha:0.95];
+    self.card.layer.cornerRadius = 16;
     self.card.layer.borderWidth = 1.5;
     self.card.layer.borderColor = [UIColor colorWithRed:0.62 green:0.25 blue:0.95 alpha:1].CGColor;
+    self.card.layer.shadowColor = [UIColor colorWithRed:0.62 green:0.25 blue:0.95 alpha:1].CGColor;
+    self.card.layer.shadowRadius = 12;
+    self.card.layer.shadowOpacity = 0.6;
     [self.view addSubview:self.card];
 
-    // Adiciona o gesto de arrastar no painel
+    // Gesto de arrastar APENAS no topo do painel pra não bugar os botões
     UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePan:)];
     [self.card addGestureRecognizer:pan];
 
-    // Título
+    // 2. CABEÇALHO
+    self.header = [UIView new];
+    self.header.translatesAutoresizingMaskIntoConstraints = NO;
+    self.header.backgroundColor = [UIColor colorWithRed:0.15 green:0.05 blue:0.25 alpha:1];
+    self.header.layer.cornerRadius = 12;
+    self.header.layer.maskedCorners = kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner;
+    [self.card addSubview:self.header];
+
     UILabel *title = [UILabel new];
     title.translatesAutoresizingMaskIntoConstraints = NO;
     title.text = @"PURPOU EXECUTOR";
     title.textColor = UIColor.whiteColor;
-    title.font = [UIFont systemFontOfSize:14 weight:UIFontWeightBold];
+    title.font = [UIFont systemFontOfSize:12 weight:UIFontWeightHeavy];
     title.textAlignment = NSTextAlignmentCenter;
-    [self.card addSubview:title];
+    [self.header addSubview:title];
 
-    // Botão Aimbot
-    UIButton *aimbotBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-    aimbotBtn.translatesAutoresizingMaskIntoConstraints = NO;
-    aimbotBtn.backgroundColor = [UIColor colorWithRed:0.43 green:0.16 blue:0.72 alpha:1];
-    aimbotBtn.layer.cornerRadius = 8;
-    [aimbotBtn setTitle:@"Aimbot: OFF" forState:UIControlStateNormal];
-    [aimbotBtn setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
-    aimbotBtn.titleLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightMedium];
-    [aimbotBtn addTarget:self action:@selector(toggleAimbot:) forControlEvents:UIControlEventTouchUpInside];
-    [self.card addSubview:aimbotBtn];
+    // 3. BOTÃO AIMBOT
+    self.aimbotBtn = [UIButton buttonWithType:UIButtonTypeSystem];
+    self.aimbotBtn.translatesAutoresizingMaskIntoConstraints = NO;
+    self.aimbotBtn.backgroundColor = [UIColor colorWithRed:0.15 green:0.08 blue:0.25 alpha:1];
+    self.aimbotBtn.layer.cornerRadius = 10;
+    self.aimbotBtn.layer.borderWidth = 1;
+    self.aimbotBtn.layer.borderColor = [UIColor colorWithRed:0.43 green:0.16 blue:0.72 alpha:1].CGColor;
+    [self.aimbotBtn setTitle:@"Aimbot: OFF" forState:UIControlStateNormal];
+    [self.aimbotBtn setTitleColor:[UIColor colorWithWhite:0.8 alpha:1] forState:UIControlStateNormal];
+    self.aimbotBtn.titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightBold];
+    [self.aimbotBtn addTarget:self action:@selector(toggleAimbot:) forControlEvents:UIControlEventTouchUpInside];
+    [self.card addSubview:self.aimbotBtn];
 
-    // Botão de Fechar (X)
-    UIButton *closeBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-    closeBtn.translatesAutoresizingMaskIntoConstraints = NO;
-    [closeBtn setTitle:@"X" forState:UIControlStateNormal];
-    [closeBtn setTitleColor:[UIColor colorWithWhite:1 alpha:0.6] forState:UIControlStateNormal];
-    [closeBtn addTarget:self action:@selector(closeTapped) forControlEvents:UIControlEventTouchUpInside];
-    [self.card addSubview:closeBtn];
+    // 4. SLIDER DE FOV (Visual apenas por enquanto)
+    UILabel *fovTitle = [UILabel new];
+    fovTitle.translatesAutoresizingMaskIntoConstraints = NO;
+    fovTitle.text = @"FOV: 90°";
+    fovTitle.textColor = [UIColor colorWithWhite:0.7 alpha:1];
+    fovTitle.font = [UIFont systemFontOfSize:10 weight:UIFontWeightMedium];
+    fovTitle.tag = 999;
+    [self.card addSubview:fovTitle];
+
+    self.fovSliderBg = [UIView new];
+    self.fovSliderBg.translatesAutoresizingMaskIntoConstraints = NO;
+    self.fovSliderBg.backgroundColor = [UIColor colorWithWhite:1 alpha:0.1];
+    self.fovSliderBg.layer.cornerRadius = 3;
+    [self.card addSubview:self.fovSliderBg];
+
+    self.fovSliderThumb = [UIView new];
+    self.fovSliderThumb.translatesAutoresizingMaskIntoConstraints = NO;
+    self.fovSliderThumb.backgroundColor = [UIColor colorWithRed:0.62 green:0.25 blue:0.95 alpha:1];
+    self.fovSliderThumb.layer.cornerRadius = 6;
+    [self.fovSliderBg addSubview:self.fovSliderThumb];
 
     [NSLayoutConstraint activateConstraints:@[
+        // Painel
         [self.card.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
         [self.card.centerYAnchor constraintEqualToAnchor:self.view.centerYAnchor],
-        [self.card.widthAnchor constraintEqualToConstant:180],
-        [self.card.heightAnchor constraintEqualToConstant:120],
+        [self.card.widthAnchor constraintEqualToConstant:220],
+        [self.card.heightAnchor constraintEqualToConstant:160],
 
-        [title.topAnchor constraintEqualToAnchor:self.card.topAnchor constant:10],
-        [title.leadingAnchor constraintEqualToAnchor:self.card.leadingAnchor constant:10],
-        [title.trailingAnchor constraintEqualToAnchor:self.card.trailingAnchor constant:-10],
+        // Header
+        [self.header.topAnchor constraintEqualToAnchor:self.card.topAnchor],
+        [self.header.leadingAnchor constraintEqualToAnchor:self.card.leadingAnchor],
+        [self.header.trailingAnchor constraintEqualToAnchor:self.card.trailingAnchor],
+        [self.header.heightAnchor constraintEqualToConstant:36],
 
-        [closeBtn.topAnchor constraintEqualToAnchor:self.card.topAnchor constant:8],
-        [closeBtn.trailingAnchor constraintEqualToAnchor:self.card.trailingAnchor constant:-8],
-        [closeBtn.widthAnchor constraintEqualToConstant:20],
-        [closeBtn.heightAnchor constraintEqualToConstant:20],
+        [title.centerXAnchor constraintEqualToAnchor:self.header.centerXAnchor],
+        [title.centerYAnchor constraintEqualToAnchor:self.header.centerYAnchor],
 
-        [aimbotBtn.topAnchor constraintEqualToAnchor:title.bottomAnchor constant:15],
-        [aimbotBtn.leadingAnchor constraintEqualToAnchor:self.card.leadingAnchor constant:15],
-        [aimbotBtn.trailingAnchor constraintEqualToAnchor:self.card.trailingAnchor constant:-15],
-        [aimbotBtn.heightAnchor constraintEqualToConstant:36]
+        // Botão Aimbot
+        [self.aimbotBtn.topAnchor constraintEqualToAnchor:self.header.bottomAnchor constant:15],
+        [self.aimbotBtn.leadingAnchor constraintEqualToAnchor:self.card.leadingAnchor constant:15],
+        [self.aimbotBtn.trailingAnchor constraintEqualToAnchor:self.card.trailingAnchor constant:-15],
+        [self.aimbotBtn.heightAnchor constraintEqualToConstant:40],
+
+        // Slider FOV
+        [fovTitle.topAnchor constraintEqualToAnchor:self.aimbotBtn.bottomAnchor constant:15],
+        [fovTitle.leadingAnchor constraintEqualToAnchor:self.card.leadingAnchor constant:20],
+
+        [self.fovSliderBg.topAnchor constraintEqualToAnchor:fovTitle.bottomAnchor constant:8],
+        [self.fovSliderBg.leadingAnchor constraintEqualToAnchor:self.card.leadingAnchor constant:20],
+        [self.fovSliderBg.trailingAnchor constraintEqualToAnchor:self.card.trailingAnchor constant:-20],
+        [self.fovSliderBg.heightAnchor constraintEqualToConstant:6],
+
+        [self.fovSliderThumb.centerYAnchor constraintEqualToAnchor:self.fovSliderBg.centerYAnchor],
+        [self.fovSliderThumb.leadingAnchor constraintEqualToAnchor:self.fovSliderBg.leadingAnchor constant:10],
+        [self.fovSliderThumb.widthAnchor constraintEqualToConstant:12],
+        [self.fovSliderThumb.heightAnchor constraintEqualToConstant:12],
     ]];
+
+    // 5. CÍRCULO DE FOV (Fica no centro da tela, invisível por padrão)
+    fovCircleView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 200, 200)];
+    fovCircleView.center = self.view.center;
+    fovCircleView.backgroundColor = UIColor.clearColor;
+    fovCircleView.userInteractionEnabled = NO;
+    fovCircleView.hidden = YES;
+
+    CAShapeLayer *circleLayer = [CAShapeLayer layer];
+    circleLayer.path = [UIBezierPath bezierPathWithOvalInRect:CGRectMake(0, 0, 200, 200)].CGPath;
+    circleLayer.fillColor = UIColor.clearColor.CGColor;
+    circleLayer.strokeColor = [UIColor colorWithRed:0.62 green:0.25 blue:0.95 alpha:1].CGColor;
+    circleLayer.lineWidth = 1.5;
+    [fovCircleView.layer addSublayer:circleLayer];
+
+    [self.view addSubview:fovCircleView];
 }
 
-// Lógica do Arrastar
+// Libera o toque pra janela de baixo (deixa o jogo rodar normal)
+- (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
+    UIView *hitView = [super hitTest:point withEvent:event];
+    // Se o toque for fora do painel, ignora (passa pro jogo)
+    if (hitView == self.view) {
+        return nil; 
+    }
+    return hitView;
+}
+
 - (void)handlePan:(UIPanGestureRecognizer *)gesture {
     CGPoint translation = [gesture translationInView:self.view];
     gesture.view.center = CGPointMake(gesture.view.center.x + translation.x,
@@ -90,24 +158,23 @@ static BOOL isAimbotEnabled = NO;
     [gesture setTranslation:CGPointZero inView:self.view];
 }
 
-// Lógica da Toggle Aimbot
 - (void)toggleAimbot:(UIButton *)sender {
     isAimbotEnabled = !isAimbotEnabled;
+    
     if (isAimbotEnabled) {
         [sender setTitle:@"Aimbot: ON" forState:UIControlStateNormal];
-        sender.backgroundColor = [UIColor colorWithRed:0.8 green:0.1 blue:0.4 alpha:1]; // Vermelho/Rosa
+        sender.backgroundColor = [UIColor colorWithRed:0.43 green:0.16 blue:0.72 alpha:1];
+        [sender setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
+        fovCircleView.hidden = NO;
     } else {
         [sender setTitle:@"Aimbot: OFF" forState:UIControlStateNormal];
-        sender.backgroundColor = [UIColor colorWithRed:0.43 green:0.16 blue:0.72 alpha:1]; // Roxo
+        sender.backgroundColor = [UIColor colorWithRed:0.15 green:0.08 blue:0.25 alpha:1];
+        [sender setTitleColor:[UIColor colorWithWhite:0.8 alpha:1] forState:UIControlStateNormal];
+        fovCircleView.hidden = YES;
     }
-}
-
-- (void)closeTapped {
-    PPOverlayWindow.hidden = YES;
 }
 @end
 
-// Função que mostra o painel na tela do Roblox
 static void PPShowPanel(void) {
     dispatch_async(dispatch_get_main_queue(), ^{
         if (PPOverlayWindow && !PPOverlayWindow.hidden) return;
@@ -125,16 +192,19 @@ static void PPShowPanel(void) {
         if (!PPOverlayWindow) {
             PPOverlayWindow = [[UIWindow alloc] initWithWindowScene:activeScene];
             PPOverlayWindow.frame = activeScene.coordinateSpace.bounds;
-            PPOverlayWindow.windowLevel = UIWindowLevelAlert + 1;
+            // MUDANÇA AQUI: Nível abaixo do alerta pra não travar o jogo
+            PPOverlayWindow.windowLevel = UIWindowLevelNormal + 1; 
             PPOverlayWindow.backgroundColor = UIColor.clearColor;
             PPOverlayWindow.rootViewController = [PPPanelViewController new];
+            
+            // Impede que a janela capture os toques gerais
+            PPOverlayWindow.userInteractionEnabled = YES;
         }
         PPOverlayWindow.hidden = NO;
         [PPOverlayWindow makeKeyAndVisible];
     });
 }
 
-// Hook que roda quando a dylib é injetada
 %ctor {
     @autoreleasepool {
         [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationDidBecomeActiveNotification
@@ -145,27 +215,3 @@ static void PPShowPanel(void) {
             }];
     }
 }
-
-// =====================================================================
-// AQUI ENTRA O MOTOR DO AIMBOT (Lógica de memória do Roblox)
-// =====================================================================
-// O Roblox usa o motor Unity. Pra fazer o Aimbot funcionar de verdade, 
-// você precisa hookar a função de renderização do jogo.
-// Como o Roblox atualiza os offsets toda semana, o código abaixo é um 
-// exemplo do que você colocaria no loop de renderização.
-
-/*
-extern "C" void* (*old_CameraUpdate)(void* camera);
-extern "C" void* new_CameraUpdate(void* camera) {
-    if (isAimbotEnabled) {
-        // 1. Ler a lista de jogadores (Players)
-        // 2. Calcular a distância do centro da tela até a cabeça de cada jogador
-        // 3. Achar o mais próximo
-        // 4. Rotacionar a câmera pra apontar pra ele
-    }
-    return old_CameraUpdate(camera);
-}
-%hookf(void*, CameraUpdate, void* camera) {
-    return new_CameraUpdate(camera);
-}
-*/
