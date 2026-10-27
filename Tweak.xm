@@ -6,6 +6,11 @@ static UIWindow *PPOverlayWindow;
 static UIView *PPGlobalPanelView = nil;
 
 // ==========================================
+// DECLARAÇÕES ANTECIPADAS
+// ==========================================
+static void PPShowPanel(void);
+
+// ==========================================
 // CLASSE DA JANELA (Toques corrigidos)
 // ==========================================
 @interface PPWindow : UIWindow
@@ -46,7 +51,6 @@ static UIView *PPGlobalPanelView = nil;
 }
 
 - (void)setupUI {
-    // Tamanho maior pra ficar igual ao print (340x180)
     CGFloat pW = 340.0;
     CGFloat pH = 180.0;
 
@@ -54,15 +58,11 @@ static UIView *PPGlobalPanelView = nil;
     self.panel = [[UIView alloc] initWithFrame:CGRectMake(0, 0, pW, pH)];
     self.panel.center = self.center;
     self.panel.backgroundColor = [UIColor colorWithRed:0.01 green:0.01 blue:0.01 alpha:0.98];
-    self.panel.layer.cornerRadius = 4;
+    self.panel.layer.cornerRadius = 6;
     self.panel.layer.borderWidth = 2.0;
     self.panel.layer.borderColor = [UIColor colorWithRed:0.9 green:0.1 blue:0.1 alpha:1].CGColor;
     self.panel.clipsToBounds = YES;
     [self addSubview:self.panel];
-
-    // Gesto de arrastar
-    UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePan:)];
-    [self.header addGestureRecognizer:pan]; // Adicionado depois que header for criado
 
     // 2. CABEÇALHO VERMELHO
     self.header = [[UIView alloc] initWithFrame:CGRectMake(0, 0, pW, 35)];
@@ -85,7 +85,7 @@ static UIView *PPGlobalPanelView = nil;
     [closeBtn addTarget:self action:@selector(closePanel) forControlEvents:UIControlEventTouchUpInside];
     [self.header addSubview:closeBtn];
 
-    // Adiciona o pan no header que agora existe
+    // Gesto de arrastar no header
     UIPanGestureRecognizer *dragPan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePan:)];
     [self.header addGestureRecognizer:dragPan];
 
@@ -158,18 +158,17 @@ static UIView *PPGlobalPanelView = nil;
 }
 
 - (void)closePanel {
-    self.hidden = YES;
+    PPOverlayWindow.hidden = YES;
 }
 @end
 
 // ==========================================
-// LÓGICA DOS 3 DEDOS
+// GATILHO DE 3 DEDOS
 // ==========================================
 @interface PPTouchTrigger : NSObject
 @end
 @implementation PPTouchTrigger
 + (void)setup {
-    // Escuta o toque na janela principal
     UIWindow *mainWin = UIApplication.sharedApplication.windows.firstObject;
     if (!mainWin) return;
     
