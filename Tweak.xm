@@ -3,28 +3,31 @@
 #import <QuartzCore/QuartzCore.h>
 
 static UIWindow *PPOverlayWindow;
-static UIView *PPGlobalPanelView = nil;
+static BOOL isAimbotEnabled = NO;
+static UIView *fovCircleView = nil;
 
 // ==========================================
-// DECLARAÇÕES ANTECIPADAS
-// ==========================================
-static void PPShowPanel(void);
-
-// ==========================================
-// CLASSE DA JANELA (Toques corrigidos)
+// CLASSE DA JANELA (Para girar a tela)
 // ==========================================
 @interface PPWindow : UIWindow
 @property (nonatomic, weak) UIView *panelView;
 @end
 
 @implementation PPWindow
-
-// Só bloqueia o toque se ele NÃO estiver dentro do painel
+// Isso garante que o toque fora do painel vá pro Roblox
 - (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
     if (self.panelView && CGRectContainsPoint(self.panelView.frame, point)) {
-        return [super hitTest:point withEvent:event]; // Toque no painel
+        return [super hitTest:point withEvent:event];
     }
-    return nil; // Toque no jogo
+    return nil;
+}
+
+// Isso força a janela a girar quando o celular deita
+- (void)layoutSubviews {
+    [super layoutSubviews];
+    if (self.rootViewController && self.rootViewController.view) {
+        self.rootViewController.view.frame = self.bounds;
+    }
 }
 @end
 
@@ -33,8 +36,8 @@ static void PPShowPanel(void);
 // ==========================================
 @interface PPPanelView : UIView
 @property (nonatomic, strong) UIView *panel;
-@property (nonatomic, strong) UIView *header;
 @property (nonatomic, strong) UIButton *aimbotBtn;
+@property (nonatomic, strong) UIView *toggleThumb;
 @property (nonatomic, assign) BOOL isAimbotEnabled;
 @end
 
@@ -51,31 +54,30 @@ static void PPShowPanel(void);
 }
 
 - (void)setupUI {
-    CGFloat pW = 340.0;
+    CGFloat pW = 260.0;
     CGFloat pH = 180.0;
 
-    // 1. PAINEL PRINCIPAL
+    // 1. PAINEL PRINCIPAL (Estilo Vermelho/Preto)
     self.panel = [[UIView alloc] initWithFrame:CGRectMake(0, 0, pW, pH)];
     self.panel.center = self.center;
-    self.panel.backgroundColor = [UIColor colorWithRed:0.01 green:0.01 blue:0.01 alpha:0.98];
-    self.panel.layer.cornerRadius = 6;
-    self.panel.layer.borderWidth = 2.0;
-    self.panel.layer.borderColor = [UIColor colorWithRed:0.9 green:0.1 blue:0.1 alpha:1].CGColor;
+    self.panel.backgroundColor = [UIColor colorWithRed:0.04 green:0.02 blue:0.06 alpha:0.98];
+    self.panel.layer.cornerRadius = 12;
+    self.panel.layer.borderWidth = 1.5;
+    self.panel.layer.borderColor = [UIColor colorWithRed:0.85 green:0.1 blue:0.1 alpha:1].CGColor;
     self.panel.clipsToBounds = YES;
     [self addSubview:self.panel];
 
     // 2. CABEÇALHO VERMELHO
-    self.header = [[UIView alloc] initWithFrame:CGRectMake(0, 0, pW, 35)];
-    self.header.backgroundColor = [UIColor colorWithRed:0.9 green:0.1 blue:0.1 alpha:1];
-    [self.panel addSubview:self.header];
+    UIView *header = [[UIView alloc] initWithFrame:CGRectMake(0, 0, pW, 35)];
+    header.backgroundColor = [UIColor colorWithRed:0.85 green:0.1 blue:0.1 alpha:1];
+    [self.panel addSubview:header];
 
-    // Título
     UILabel *title = [[UILabel alloc] initWithFrame:CGRectMake(0, 0, pW, 35)];
     title.text = @"PURPOU EXECUTOR";
     title.textColor = UIColor.whiteColor;
-    title.font = [UIFont boldSystemFontOfSize:14];
+    title.font = [UIFont boldSystemFontOfSize:13];
     title.textAlignment = NSTextAlignmentCenter;
-    [self.header addSubview:title];
+    [header addSubview:title];
 
     // Botão X
     UIButton *closeBtn = [UIButton buttonWithType:UIButtonTypeSystem];
@@ -83,52 +85,76 @@ static void PPShowPanel(void);
     [closeBtn setTitle:@"✕" forState:UIControlStateNormal];
     [closeBtn setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
     [closeBtn addTarget:self action:@selector(closePanel) forControlEvents:UIControlEventTouchUpInside];
-    [self.header addSubview:closeBtn];
+    [header addSubview:closeBtn];
 
-    // Gesto de arrastar no header
+    // Arrastar no cabeçalho
     UIPanGestureRecognizer *dragPan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePan:)];
-    [self.header addGestureRecognizer:dragPan];
+    [header addGestureRecognizer:dragPan];
 
-    // 3. CONTAINER DO CONTEÚDO
-    UIView *content = [[UIView alloc] initWithFrame:CGRectMake(15, 50, pW - 30, 100)];
+    // 3. BOTÃO AIMBOT (RETANGULAR ESTILO MENU)
+    UIView *content = [[UIView alloc] initWithFrame:CGRectMake(15, 50, pW - 30, 110)];
     content.backgroundColor = [UIColor clearColor];
     [self.panel addSubview:content];
 
+    // Fundo do botão Aimbot (Card escuro)
+    UIView *aimbotCard = [[UIView alloc] initWithFrame:CGRectMake(0, 0, pW - 30, 45)];
+    aimbotCard.backgroundColor = [UIColor colorWithRed:0.1 green:0.05 blue:0.15 alpha:1];
+    aimbotCard.layer.cornerRadius = 8;
+    aimbotCard.layer.borderWidth = 1;
+    aimbotCard.layer.borderColor = [UIColor colorWithRed:0.3 green:0.1 blue:0.4 alpha:1].CGColor;
+    [content addSubview:aimbotCard];
+
     // Ícone Quadrado Vermelho
-    UIView *iconBox = [[UIView alloc] initWithFrame:CGRectMake(0, 15, 40, 40)];
-    iconBox.backgroundColor = [UIColor colorWithRed:0.9 green:0.1 blue:0.1 alpha:1];
-    iconBox.layer.cornerRadius = 6;
-    [content addSubview:iconBox];
+    UIView *iconBox = [[UIView alloc] initWithFrame:CGRectMake(10, 10, 25, 25)];
+    iconBox.backgroundColor = [UIColor colorWithRed:0.85 green:0.1 blue:0.1 alpha:1];
+    iconBox.layer.cornerRadius = 4;
+    [aimbotCard addSubview:iconBox];
     
-    UILabel *iconTxt = [[UILabel alloc] initWithFrame:CGRectMake(0, 0, 40, 40)];
+    UILabel *iconTxt = [[UILabel alloc] initWithFrame:CGRectMake(0, 0, 25, 25)];
     iconTxt.text = @"🎯";
-    iconTxt.font = [UIFont systemFontOfSize:20];
+    iconTxt.font = [UIFont systemFontOfSize:14];
     iconTxt.textAlignment = NSTextAlignmentCenter;
     [iconBox addSubview:iconTxt];
 
     // Texto Aimbot
-    UILabel *aimbotLbl = [[UILabel alloc] initWithFrame:CGRectMake(60, 15, 120, 40)];
+    UILabel *aimbotLbl = [[UILabel alloc] initWithFrame:CGRectMake(45, 10, 100, 25)];
     aimbotLbl.text = @"Aimbot";
     aimbotLbl.textColor = UIColor.whiteColor;
-    aimbotLbl.font = [UIFont systemFontOfSize:16 weight:UIFontWeightMedium];
-    [content addSubview:aimbotLbl];
+    aimbotLbl.font = [UIFont boldSystemFontOfSize:13];
+    [aimbotCard addSubview:aimbotLbl];
 
-    // BOTÃO TOGGLE
+    // BOTÃO TOGGLE (Switch)
     self.aimbotBtn = [UIButton buttonWithType:UIButtonTypeCustom];
-    self.aimbotBtn.frame = CGRectMake(pW - 90, 22, 60, 30);
+    self.aimbotBtn.frame = CGRectMake(pW - 85, 8, 50, 28);
     self.aimbotBtn.backgroundColor = [UIColor colorWithWhite:0.2 alpha:1];
-    self.aimbotBtn.layer.cornerRadius = 15;
+    self.aimbotBtn.layer.cornerRadius = 14;
     self.aimbotBtn.layer.borderWidth = 1;
     self.aimbotBtn.layer.borderColor = [UIColor colorWithWhite:0.4 alpha:1].CGColor;
     [self.aimbotBtn addTarget:self action:@selector(toggleAimbot) forControlEvents:UIControlEventTouchUpInside];
-    [content addSubview:self.aimbotBtn];
+    [aimbotCard addSubview:self.aimbotBtn];
 
     // Bolinha do Toggle
-    UIView *thumb = [[UIView alloc] initWithFrame:CGRectMake(3, 3, 24, 24)];
-    thumb.backgroundColor = UIColor.whiteColor;
-    thumb.layer.cornerRadius = 12;
-    thumb.tag = 101;
-    [self.aimbotBtn addSubview:thumb];
+    self.toggleThumb = [[UIView alloc] initWithFrame:CGRectMake(2, 2, 24, 24)];
+    self.toggleThumb.backgroundColor = UIColor.whiteColor;
+    self.toggleThumb.layer.cornerRadius = 12;
+    [self.aimbotBtn addSubview:self.toggleThumb];
+
+    // 4. SLIDER FOV (Estilo ImGui do teu print)
+    UILabel *fovLbl = [[UILabel alloc] initWithFrame:CGRectMake(10, 60, 100, 20)];
+    fovLbl.text = @"FOV: 90";
+    fovLbl.textColor = UIColor.lightGrayColor;
+    fovLbl.font = [UIFont systemFontOfSize:12];
+    [content addSubview:fovLbl];
+
+    UISlider *fovSlider = [[UISlider alloc] initWithFrame:CGRectMake(10, 80, pW - 50, 20)];
+    fovSlider.minimumValue = 10;
+    fovSlider.maximumValue = 360;
+    fovSlider.value = 90;
+    fovSlider.minimumTrackTintColor = [UIColor colorWithRed:0.85 green:0.1 blue:0.1 alpha:1]; // Vermelho
+    fovSlider.maximumTrackTintColor = [UIColor colorWithWhite:0.3 alpha:1];
+    fovSlider.thumbTintColor = UIColor.whiteColor;
+    [fovSlider addTarget:self action:@selector(fovChanged:) forControlEvents:UIControlEventValueChanged];
+    [content addSubview:fovSlider];
 }
 
 - (void)handlePan:(UIPanGestureRecognizer *)gesture {
@@ -139,53 +165,29 @@ static void PPShowPanel(void);
 
 - (void)toggleAimbot {
     self.isAimbotEnabled = !self.isAimbotEnabled;
-    UIView *thumb = [self.aimbotBtn viewWithTag:101];
-    
     BOOL isEnabled = self.isAimbotEnabled;
     UIButton *btn = self.aimbotBtn;
+    UIView *thumb = self.toggleThumb;
     
     [UIView animateWithDuration:0.2 animations:^{
         if (isEnabled) {
-            btn.backgroundColor = [UIColor colorWithRed:0.9 green:0.1 blue:0.1 alpha:1];
-            btn.layer.borderColor = [UIColor colorWithRed:0.9 green:0.1 blue:0.1 alpha:1].CGColor;
-            thumb.frame = CGRectMake(33, 3, 24, 24);
+            btn.backgroundColor = [UIColor colorWithRed:0.85 green:0.1 blue:0.1 alpha:1];
+            thumb.frame = CGRectMake(24, 2, 24, 24);
+            fovCircleView.hidden = NO; // LIGA O CÍRCULO DE FOV
         } else {
             btn.backgroundColor = [UIColor colorWithWhite:0.2 alpha:1];
-            btn.layer.borderColor = [UIColor colorWithWhite:0.4 alpha:1].CGColor;
-            thumb.frame = CGRectMake(3, 3, 24, 24);
+            thumb.frame = CGRectMake(2, 2, 24, 24);
+            fovCircleView.hidden = YES; // DESLIGA O CÍRCULO DE FOV
         }
     }];
 }
 
+- (void)fovChanged:(UISlider *)sender {
+    // Aqui tu pode atualizar o texto do FOV
+}
+
 - (void)closePanel {
     PPOverlayWindow.hidden = YES;
-}
-@end
-
-// ==========================================
-// GATILHO DE 3 DEDOS
-// ==========================================
-@interface PPTouchTrigger : NSObject
-@end
-@implementation PPTouchTrigger
-+ (void)setup {
-    UIWindow *mainWin = UIApplication.sharedApplication.windows.firstObject;
-    if (!mainWin) return;
-    
-    UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(triggered)];
-    tap.numberOfTouchesRequired = 3;
-    tap.numberOfTapsRequired = 1;
-    [mainWin addGestureRecognizer:tap];
-}
-
-+ (void)triggered {
-    if (!PPOverlayWindow) {
-        PPShowPanel();
-    }
-    PPOverlayWindow.hidden = !PPOverlayWindow.hidden;
-    if (!PPOverlayWindow.hidden) {
-        [PPOverlayWindow makeKeyAndVisible];
-    }
 }
 @end
 
@@ -214,16 +216,31 @@ static void PPShowPanel(void) {
         UIViewController *vc = [UIViewController new];
         vc.view.backgroundColor = UIColor.clearColor;
         
-        PPPanelView *panelView = [[PPPanelView alloc] initWithFrame:activeScene.coordinateSpace.bounds];
+        PPPanelView *panelView = [[PPPanelView alloc] initWithFrame:PPOverlayWindow.bounds];
         [vc.view addSubview:panelView];
         
         PPOverlayWindow.rootViewController = vc;
-        ((PPWindow *)PPOverlayWindow).panelView = panelView.panel;
-        PPGlobalPanelView = panelView;
-
+        ((PPWindow *)PPOverlayWindow).panelView = panelView;
         PPOverlayWindow.hidden = NO;
         [PPOverlayWindow makeKeyAndVisible];
     });
+}
+
+// CÍRCULO DE FOV FINO
+static void CreateFovCircle(UIView *parentView) {
+    fovCircleView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 200, 200)];
+    fovCircleView.center = parentView.center;
+    fovCircleView.backgroundColor = UIColor.clearColor;
+    fovCircleView.userInteractionEnabled = NO;
+    fovCircleView.hidden = YES;
+
+    CAShapeLayer *circleLayer = [CAShapeLayer layer];
+    circleLayer.path = [UIBezierPath bezierPathWithOvalInRect:CGRectMake(0, 0, 200, 200)].CGPath;
+    circleLayer.fillColor = UIColor.clearColor.CGColor;
+    circleLayer.strokeColor = [UIColor colorWithRed:0.85 green:0.1 blue:0.1 alpha:1].CGColor;
+    circleLayer.lineWidth = 1.0;
+    [fovCircleView.layer addSublayer:circleLayer];
+    [parentView addSubview:fovCircleView];
 }
 
 %ctor {
@@ -234,7 +251,9 @@ static void PPShowPanel(void) {
                 dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)),
                     dispatch_get_main_queue(), ^{ 
                         PPShowPanel();
-                        [PPTouchTrigger setup];
+                        if (PPOverlayWindow) {
+                            CreateFovCircle(PPOverlayWindow.rootViewController.view);
+                        }
                     });
             }];
     }
