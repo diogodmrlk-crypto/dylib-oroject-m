@@ -8,11 +8,10 @@ static UIView *fovCircleView = nil;
 
 @interface PPPanelViewController : UIViewController <UIGestureRecognizerDelegate>
 @property (nonatomic, strong) UIView *card;
-@property (nonatomic, strong) UIView *header;
-@property (nonatomic, strong) UILabel *statusLabel;
 @property (nonatomic, strong) UIButton *aimbotBtn;
-@property (nonatomic, strong) UIView *fovSliderBg;
-@property (nonatomic, strong) UIView *fovSliderThumb;
+@property (nonatomic, strong) UISlider *fovSlider;
+@property (nonatomic, strong) UILabel *fovLabel;
+@property (nonatomic, strong) UIPanGestureRecognizer *panGesture;
 @end
 
 @implementation PPPanelViewController
@@ -21,105 +20,140 @@ static UIView *fovCircleView = nil;
     [super viewDidLoad];
     self.view.backgroundColor = UIColor.clearColor;
 
-    // 1. PAINEL PRINCIPAL (Arrastável)
+    // ==========================================
+    // 1. O PAINEL PRINCIPAL (QUADRADO E ESTILIZADO)
+    // ==========================================
     self.card = [UIView new];
     self.card.translatesAutoresizingMaskIntoConstraints = NO;
-    self.card.backgroundColor = [UIColor colorWithRed:0.06 green:0.04 blue:0.10 alpha:0.95];
-    self.card.layer.cornerRadius = 16;
+    // Fundo escuro semi-transparente com borda vermelha (baseado na sua 2ª foto)
+    self.card.backgroundColor = [UIColor colorWithRed:0.05 green:0.02 blue:0.08 alpha:0.95];
+    self.card.layer.cornerRadius = 4; // Quadrado, canto levemente arredondado
     self.card.layer.borderWidth = 1.5;
-    self.card.layer.borderColor = [UIColor colorWithRed:0.62 green:0.25 blue:0.95 alpha:1].CGColor;
-    self.card.layer.shadowColor = [UIColor colorWithRed:0.62 green:0.25 blue:0.95 alpha:1].CGColor;
-    self.card.layer.shadowRadius = 12;
-    self.card.layer.shadowOpacity = 0.6;
+    self.card.layer.borderColor = [UIColor colorWithRed:0.85 green:0.1 blue:0.1 alpha:1].CGColor; // Borda Vermelha
     [self.view addSubview:self.card];
 
-    // Gesto de arrastar
-    UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePan:)];
-    [self.card addGestureRecognizer:pan];
-
+    // ==========================================
     // 2. CABEÇALHO
-    self.header = [UIView new];
-    self.header.translatesAutoresizingMaskIntoConstraints = NO;
-    self.header.backgroundColor = [UIColor colorWithRed:0.15 green:0.05 blue:0.25 alpha:1];
-    self.header.layer.cornerRadius = 12;
-    self.header.layer.maskedCorners = kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner;
-    [self.card addSubview:self.header];
+    // ==========================================
+    UIView *header = [UIView new];
+    header.translatesAutoresizingMaskIntoConstraints = NO;
+    header.backgroundColor = [UIColor colorWithRed:0.85 green:0.1 blue:0.1 alpha:1];
+    [self.card addSubview:header];
 
     UILabel *title = [UILabel new];
     title.translatesAutoresizingMaskIntoConstraints = NO;
     title.text = @"PURPOU EXECUTOR";
     title.textColor = UIColor.whiteColor;
-    title.font = [UIFont systemFontOfSize:12 weight:UIFontWeightHeavy];
+    title.font = [UIFont systemFontOfSize:12 weight:UIFontWeightBold];
     title.textAlignment = NSTextAlignmentCenter;
-    [self.header addSubview:title];
+    [header addSubview:title];
+    
+    // Botão de fechar
+    UIButton *closeBtn = [UIButton buttonWithType:UIButtonTypeSystem];
+    closeBtn.translatesAutoresizingMaskIntoConstraints = NO;
+    [closeBtn setTitle:@"X" forState:UIControlStateNormal];
+    [closeBtn setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
+    [closeBtn addTarget:self action:@selector(closeTapped) forControlEvents:UIControlEventTouchUpInside];
+    [header addSubview:closeBtn];
 
-    // 3. BOTÃO AIMBOT
+    // ==========================================
+    // 3. CONTAINER (Área dos controles)
+    // ==========================================
+    UIView *contentBox = [UIView new];
+    contentBox.translatesAutoresizingMaskIntoConstraints = NO;
+    contentBox.backgroundColor = [UIColor colorWithRed:0.08 green:0.04 blue:0.12 alpha:1];
+    [self.card addSubview:contentBox];
+
+    // BOTÃO DO AIMBOT
     self.aimbotBtn = [UIButton buttonWithType:UIButtonTypeSystem];
     self.aimbotBtn.translatesAutoresizingMaskIntoConstraints = NO;
-    self.aimbotBtn.backgroundColor = [UIColor colorWithRed:0.15 green:0.08 blue:0.25 alpha:1];
-    self.aimbotBtn.layer.cornerRadius = 10;
+    // Cor inicial (desligado)
+    self.aimbotBtn.backgroundColor = [UIColor colorWithRed:0.15 green:0.05 blue:0.2 alpha:1];
+    self.aimbotBtn.layer.cornerRadius = 4;
     self.aimbotBtn.layer.borderWidth = 1;
-    self.aimbotBtn.layer.borderColor = [UIColor colorWithRed:0.43 green:0.16 blue:0.72 alpha:1].CGColor;
+    self.aimbotBtn.layer.borderColor = [UIColor colorWithWhite:0.4 alpha:1].CGColor;
     [self.aimbotBtn setTitle:@"Aimbot: OFF" forState:UIControlStateNormal];
-    [self.aimbotBtn setTitleColor:[UIColor colorWithWhite:0.8 alpha:1] forState:UIControlStateNormal];
-    self.aimbotBtn.titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightBold];
+    [self.aimbotBtn setTitleColor:[UIColor colorWithWhite:0.6 alpha:1] forState:UIControlStateNormal];
+    self.aimbotBtn.titleLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
     [self.aimbotBtn addTarget:self action:@selector(toggleAimbot:) forControlEvents:UIControlEventTouchUpInside];
-    [self.card addSubview:self.aimbotBtn];
+    [contentBox addSubview:self.aimbotBtn];
 
-    // 4. SLIDER DE FOV
-    UILabel *fovTitle = [UILabel new];
-    fovTitle.translatesAutoresizingMaskIntoConstraints = NO;
-    fovTitle.text = @"FOV: 90°";
-    fovTitle.textColor = [UIColor colorWithWhite:0.7 alpha:1];
-    fovTitle.font = [UIFont systemFontOfSize:10 weight:UIFontWeightMedium];
-    [self.card addSubview:fovTitle];
+    // LABEL DO FOV
+    self.fovLabel = [UILabel new];
+    self.fovLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    self.fovLabel.text = @"FOV: 90";
+    self.fovLabel.textColor = UIColor.whiteColor;
+    self.fovLabel.font = [UIFont systemFontOfSize:11 weight:UIFontWeightMedium];
+    [contentBox addSubview:self.fovLabel];
 
-    self.fovSliderBg = [UIView new];
-    self.fovSliderBg.translatesAutoresizingMaskIntoConstraints = NO;
-    self.fovSliderBg.backgroundColor = [UIColor colorWithWhite:1 alpha:0.1];
-    self.fovSliderBg.layer.cornerRadius = 3;
-    [self.card addSubview:self.fovSliderBg];
+    // SLIDER DO FOV
+    self.fovSlider = [UISlider new];
+    self.fovSlider.translatesAutoresizingMaskIntoConstraints = NO;
+    self.fovSlider.minimumValue = 10;
+    self.fovSlider.maximumValue = 360;
+    self.fovSlider.value = 90;
+    self.fovSlider.minimumTrackTintColor = [UIColor colorWithRed:0.85 green:0.1 blue:0.1 alpha:1]; // Vermelho
+    self.fovSlider.maximumTrackTintColor = [UIColor colorWithWhite:0.3 alpha:1];
+    self.fovSlider.thumbTintColor = UIColor.whiteColor;
+    [self.fovSlider addTarget:self action:@selector(fovChanged:) forControlEvents:UIControlEventValueChanged];
+    [contentBox addSubview:self.fovSlider];
 
-    self.fovSliderThumb = [UIView new];
-    self.fovSliderThumb.translatesAutoresizingMaskIntoConstraints = NO;
-    self.fovSliderThumb.backgroundColor = [UIColor colorWithRed:0.62 green:0.25 blue:0.95 alpha:1];
-    self.fovSliderThumb.layer.cornerRadius = 6;
-    [self.fovSliderBg addSubview:self.fovSliderThumb];
+    // ==========================================
+    // 4. GESTOS
+    // ==========================================
+    // Arrastar só funciona na área do cabeçalho (pra não bugar o slider)
+    self.panGesture = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePan:)];
+    [header addGestureRecognizer:self.panGesture];
 
+    // ==========================================
+    // 5. LAYOUT (TUDO QUADRADO)
+    // ==========================================
     [NSLayoutConstraint activateConstraints:@[
+        // Painel principal fixo em um quadrado de 200x160
         [self.card.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
         [self.card.centerYAnchor constraintEqualToAnchor:self.view.centerYAnchor],
-        [self.card.widthAnchor constraintEqualToConstant:220],
-        [self.card.heightAnchor constraintEqualToConstant:160],
+        [self.card.widthAnchor constraintEqualToConstant:200],
+        [self.card.heightAnchor constraintEqualToConstant:150],
 
-        [self.header.topAnchor constraintEqualToAnchor:self.card.topAnchor],
-        [self.header.leadingAnchor constraintEqualToAnchor:self.card.leadingAnchor],
-        [self.header.trailingAnchor constraintEqualToAnchor:self.card.trailingAnchor],
-        [self.header.heightAnchor constraintEqualToConstant:36],
+        // Header
+        [header.topAnchor constraintEqualToAnchor:self.card.topAnchor],
+        [header.leadingAnchor constraintEqualToAnchor:self.card.leadingAnchor],
+        [header.trailingAnchor constraintEqualToAnchor:self.card.trailingAnchor],
+        [header.heightAnchor constraintEqualToConstant:28],
 
-        [title.centerXAnchor constraintEqualToAnchor:self.header.centerXAnchor],
-        [title.centerYAnchor constraintEqualToAnchor:self.header.centerYAnchor],
+        [title.centerXAnchor constraintEqualToAnchor:header.centerXAnchor],
+        [title.centerYAnchor constraintEqualToAnchor:header.centerYAnchor],
+        
+        [closeBtn.centerYAnchor constraintEqualToAnchor:header.centerYAnchor],
+        [closeBtn.trailingAnchor constraintEqualToAnchor:header.trailingAnchor constant:-8],
+        [closeBtn.widthAnchor constraintEqualToConstant:20],
+        [closeBtn.heightAnchor constraintEqualToConstant:20],
 
-        [self.aimbotBtn.topAnchor constraintEqualToAnchor:self.header.bottomAnchor constant:15],
-        [self.aimbotBtn.leadingAnchor constraintEqualToAnchor:self.card.leadingAnchor constant:15],
-        [self.aimbotBtn.trailingAnchor constraintEqualToAnchor:self.card.trailingAnchor constant:-15],
-        [self.aimbotBtn.heightAnchor constraintEqualToConstant:40],
+        // Content Box
+        [contentBox.topAnchor constraintEqualToAnchor:header.bottomAnchor constant:10],
+        [contentBox.leadingAnchor constraintEqualToAnchor:self.card.leadingAnchor constant:10],
+        [contentBox.trailingAnchor constraintEqualToAnchor:self.card.trailingAnchor constant:-10],
+        [contentBox.bottomAnchor constraintEqualToAnchor:self.card.bottomAnchor constant:-10],
 
-        [fovTitle.topAnchor constraintEqualToAnchor:self.aimbotBtn.bottomAnchor constant:15],
-        [fovTitle.leadingAnchor constraintEqualToAnchor:self.card.leadingAnchor constant:20],
+        // Botão Aimbot
+        [self.aimbotBtn.topAnchor constraintEqualToAnchor:contentBox.topAnchor constant:5],
+        [self.aimbotBtn.leadingAnchor constraintEqualToAnchor:contentBox.leadingAnchor],
+        [self.aimbotBtn.trailingAnchor constraintEqualToAnchor:contentBox.trailingAnchor],
+        [self.aimbotBtn.heightAnchor constraintEqualToConstant:32],
 
-        [self.fovSliderBg.topAnchor constraintEqualToAnchor:fovTitle.bottomAnchor constant:8],
-        [self.fovSliderBg.leadingAnchor constraintEqualToAnchor:self.card.leadingAnchor constant:20],
-        [self.fovSliderBg.trailingAnchor constraintEqualToAnchor:self.card.trailingAnchor constant:-20],
-        [self.fovSliderBg.heightAnchor constraintEqualToConstant:6],
+        // FOV Label
+        [self.fovLabel.topAnchor constraintEqualToAnchor:self.aimbotBtn.bottomAnchor constant:12],
+        [self.fovLabel.leadingAnchor constraintEqualToAnchor:contentBox.leadingAnchor],
 
-        [self.fovSliderThumb.centerYAnchor constraintEqualToAnchor:self.fovSliderBg.centerYAnchor],
-        [self.fovSliderThumb.leadingAnchor constraintEqualToAnchor:self.fovSliderBg.leadingAnchor constant:10],
-        [self.fovSliderThumb.widthAnchor constraintEqualToConstant:12],
-        [self.fovSliderThumb.heightAnchor constraintEqualToConstant:12],
+        // Slider
+        [self.fovSlider.topAnchor constraintEqualToAnchor:self.fovLabel.bottomAnchor constant:2],
+        [self.fovSlider.leadingAnchor constraintEqualToAnchor:contentBox.leadingAnchor],
+        [self.fovSlider.trailingAnchor constraintEqualToAnchor:contentBox.trailingAnchor],
     ]];
 
-    // 5. CÍRCULO DE FOV
+    // ==========================================
+    // 6. CÍRCULO DE FOV FINO
+    // ==========================================
     fovCircleView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 200, 200)];
     fovCircleView.center = self.view.center;
     fovCircleView.backgroundColor = UIColor.clearColor;
@@ -129,8 +163,8 @@ static UIView *fovCircleView = nil;
     CAShapeLayer *circleLayer = [CAShapeLayer layer];
     circleLayer.path = [UIBezierPath bezierPathWithOvalInRect:CGRectMake(0, 0, 200, 200)].CGPath;
     circleLayer.fillColor = UIColor.clearColor.CGColor;
-    circleLayer.strokeColor = [UIColor colorWithRed:0.62 green:0.25 blue:0.95 alpha:1].CGColor;
-    circleLayer.lineWidth = 1.5;
+    circleLayer.strokeColor = [UIColor colorWithRed:0.85 green:0.1 blue:0.1 alpha:1].CGColor; // Vermelho fino
+    circleLayer.lineWidth = 1.0;
     [fovCircleView.layer addSublayer:circleLayer];
 
     [self.view addSubview:fovCircleView];
@@ -138,8 +172,8 @@ static UIView *fovCircleView = nil;
 
 - (void)handlePan:(UIPanGestureRecognizer *)gesture {
     CGPoint translation = [gesture translationInView:self.view];
-    gesture.view.center = CGPointMake(gesture.view.center.x + translation.x,
-                                      gesture.view.center.y + translation.y);
+    self.card.center = CGPointMake(self.card.center.x + translation.x,
+                                   self.card.center.y + translation.y);
     [gesture setTranslation:CGPointZero inView:self.view];
 }
 
@@ -148,23 +182,40 @@ static UIView *fovCircleView = nil;
     
     if (isAimbotEnabled) {
         [sender setTitle:@"Aimbot: ON" forState:UIControlStateNormal];
-        sender.backgroundColor = [UIColor colorWithRed:0.43 green:0.16 blue:0.72 alpha:1];
+        sender.backgroundColor = [UIColor colorWithRed:0.85 green:0.1 blue:0.1 alpha:1]; // Vermelho ligado
+        sender.layer.borderColor = [UIColor colorWithRed:0.85 green:0.1 blue:0.1 alpha:1].CGColor;
         [sender setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
         fovCircleView.hidden = NO;
     } else {
         [sender setTitle:@"Aimbot: OFF" forState:UIControlStateNormal];
-        sender.backgroundColor = [UIColor colorWithRed:0.15 green:0.08 blue:0.25 alpha:1];
-        [sender setTitleColor:[UIColor colorWithWhite:0.8 alpha:1] forState:UIControlStateNormal];
+        sender.backgroundColor = [UIColor colorWithRed:0.15 green:0.05 blue:0.2 alpha:1]; // Desligado
+        sender.layer.borderColor = [UIColor colorWithWhite:0.4 alpha:1].CGColor;
+        [sender setTitleColor:[UIColor colorWithWhite:0.6 alpha:1] forState:UIControlStateNormal];
         fovCircleView.hidden = YES;
     }
+}
+
+- (void)fovChanged:(UISlider *)sender {
+    self.fovLabel.text = [NSString stringWithFormat:@"FOV: %.0f", sender.value];
+    
+    // Atualiza o tamanho do círculo na tela
+    CGFloat newSize = sender.value * 1.5; // Multiplicador pra ficar visível
+    fovCircleView.bounds = CGRectMake(0, 0, newSize, newSize);
+    
+    // Redesenha o círculo
+    CAShapeLayer *circleLayer = (CAShapeLayer *)fovCircleView.layer.sublayers.firstObject;
+    circleLayer.path = [UIBezierPath bezierPathWithOvalInRect:fovCircleView.bounds].CGPath;
+    fovCircleView.center = self.view.center; // Mantém centralizado
+}
+
+- (void)closeTapped {
+    PPOverlayWindow.hidden = YES;
 }
 @end
 
 // ==========================================
-// A MÁGICA PRA NÃO TRAVAR O JOGO
+// JANELA QUE IGNORA CLIQUES FORA DO PAINEL
 // ==========================================
-// Criamos uma subclasse da UIWindow que só captura os toques se 
-// eles caírem DENTRO do painel. Se tocar fora, o toque vai pro Roblox.
 @interface PPOverlayWindowClass : UIWindow
 @property (nonatomic, weak) UIView *menuView;
 @end
@@ -174,12 +225,12 @@ static UIView *fovCircleView = nil;
 - (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
     UIView *hitView = [super hitTest:point withEvent:event];
     
-    // Se o toque foi em cima do painel (menuView), deixa acontecer
+    // Se o toque tá DENTRO do painel, deixa clicar nos botões
     if (self.menuView && CGRectContainsPoint(self.menuView.frame, point)) {
         return hitView;
     }
     
-    // Se o toque foi no FOV ou fora do painel, passa pro jogo
+    // Se o toque foi FORA, o jogo recebe
     return nil;
 }
 @end
@@ -199,7 +250,6 @@ static void PPShowPanel(void) {
         if (!activeScene) return;
 
         if (!PPOverlayWindow) {
-            // Usa a nossa janela modificada
             PPOverlayWindow = [[PPOverlayWindowClass alloc] initWithWindowScene:activeScene];
             PPOverlayWindow.frame = activeScene.coordinateSpace.bounds;
             PPOverlayWindow.windowLevel = UIWindowLevelNormal + 1;
@@ -208,7 +258,6 @@ static void PPShowPanel(void) {
             PPPanelViewController *vc = [PPPanelViewController new];
             PPOverlayWindow.rootViewController = vc;
             
-            // Avisa a janela onde tá o painel
             ((PPOverlayWindowClass *)PPOverlayWindow).menuView = vc.card;
         }
         PPOverlayWindow.hidden = NO;
