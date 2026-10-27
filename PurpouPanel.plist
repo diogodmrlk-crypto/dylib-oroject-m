@@ -1,0 +1,8 @@
+
+{
+    Filter = {
+        Bundles = (
+            "com.InsanityGroup.ProjetoGrau2"
+        );
+    };
+}
