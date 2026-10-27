@@ -1,0 +1,9 @@
+Package: com.purpou.panel
+Name: PurpouPanel
+Version: 1.0.0
+Architecture: iphoneos-arm
+Description: Painel visual demonstrativo para iOS
+Maintainer: Purpou
+Author: Purpou
+Section: Tweaks
+Depends: mobilesubstrate
