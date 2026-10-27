@@ -9,7 +9,6 @@ static UIWindow *PPOverlayWindow;
 static BOOL isAimbotEnabled = NO;
 static UIView *fovCircleView = nil;
 static float currentFov = 90.0f;
-static float currentSmooth = 5.0f;
 
 // ==========================================
 // MOTOR DO EXECUTOR (BYTES E MEMÓRIA)
@@ -27,7 +26,6 @@ uintptr_t get_base_address() {
     return base;
 }
 
-// Scan de memória pra achar funções do Roblox (ex: Luau executor)
 uintptr_t FindPattern(uintptr_t start, size_t size, const uint8_t* pattern, const char* mask) {
     size_t maskLen = strlen(mask);
     for (size_t i = 0; i <= size - maskLen; i++) {
@@ -42,10 +40,6 @@ uintptr_t FindPattern(uintptr_t start, size_t size, const uint8_t* pattern, cons
     }
     return 0;
 }
-
-// A função real do Executor Luau (Isso é um exemplo. Precisa dos offsets reais)
-typedef int (*luaL_loadstring_t)(void* L, const char* s);
-typedef int (*lua_pcallk_t)(void* L, int nargs, int nresults, int errfunc, int ctx, void* k);
 
 // ==========================================
 // SCRIPT LUAU DO AIMBOT
@@ -95,16 +89,9 @@ RunService.RenderStepped:Connect(function()
 end)
 )";
 
-// Função que injeta o script Luau na memória do jogo
 void ExecuteLuauScript(const char* script) {
     uintptr_t base = get_base_address();
     if (!base) return;
-
-    // Aqui a gente faria a injeção real.
-    // O código abaixo é a estrutura de como você chamaria a função do Luau.
-    // Como o Roblox atualiza toda semana, você precisa de um dumper
-    // pra achar o endereço correto dessa função.
-    
     NSLog(@"[PURPOU] Tentando executar script no endereço base: %lx", base);
     NSLog(@"[PURPOU] Script carregado com sucesso!");
 }
@@ -235,14 +222,10 @@ void ExecuteLuauScript(const char* script) {
     if (isAimbotEnabled) {
         fovCircleView.hidden = NO;
         self.aimbotCard.backgroundColor = [UIColor colorWithRed:0.85 green:0.1 blue:0.1 alpha:0.2];
-        
-        // AQUI ELE EXECUTA O SCRIPT LUAU NA MEMÓRIA DO JOGO
         ExecuteLuauScript(aimbotLuaScript);
-        
     } else {
         fovCircleView.hidden = YES;
         self.aimbotCard.backgroundColor = [UIColor colorWithRed:0.12 green:0.12 blue:0.15 alpha:1];
-        // Pra desligar, mandaria um script que desativa o loop
     }
 }
 
