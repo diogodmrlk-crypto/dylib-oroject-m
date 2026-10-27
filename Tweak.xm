@@ -33,7 +33,7 @@ static UIView *fovCircleView = nil;
     self.card.layer.shadowOpacity = 0.6;
     [self.view addSubview:self.card];
 
-    // Gesto de arrastar APENAS no topo do painel pra não bugar os botões
+    // Gesto de arrastar
     UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePan:)];
     [self.card addGestureRecognizer:pan];
 
@@ -66,13 +66,12 @@ static UIView *fovCircleView = nil;
     [self.aimbotBtn addTarget:self action:@selector(toggleAimbot:) forControlEvents:UIControlEventTouchUpInside];
     [self.card addSubview:self.aimbotBtn];
 
-    // 4. SLIDER DE FOV (Visual apenas por enquanto)
+    // 4. SLIDER DE FOV
     UILabel *fovTitle = [UILabel new];
     fovTitle.translatesAutoresizingMaskIntoConstraints = NO;
     fovTitle.text = @"FOV: 90°";
     fovTitle.textColor = [UIColor colorWithWhite:0.7 alpha:1];
     fovTitle.font = [UIFont systemFontOfSize:10 weight:UIFontWeightMedium];
-    fovTitle.tag = 999;
     [self.card addSubview:fovTitle];
 
     self.fovSliderBg = [UIView new];
@@ -88,13 +87,11 @@ static UIView *fovCircleView = nil;
     [self.fovSliderBg addSubview:self.fovSliderThumb];
 
     [NSLayoutConstraint activateConstraints:@[
-        // Painel
         [self.card.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
         [self.card.centerYAnchor constraintEqualToAnchor:self.view.centerYAnchor],
         [self.card.widthAnchor constraintEqualToConstant:220],
         [self.card.heightAnchor constraintEqualToConstant:160],
 
-        // Header
         [self.header.topAnchor constraintEqualToAnchor:self.card.topAnchor],
         [self.header.leadingAnchor constraintEqualToAnchor:self.card.leadingAnchor],
         [self.header.trailingAnchor constraintEqualToAnchor:self.card.trailingAnchor],
@@ -103,13 +100,11 @@ static UIView *fovCircleView = nil;
         [title.centerXAnchor constraintEqualToAnchor:self.header.centerXAnchor],
         [title.centerYAnchor constraintEqualToAnchor:self.header.centerYAnchor],
 
-        // Botão Aimbot
         [self.aimbotBtn.topAnchor constraintEqualToAnchor:self.header.bottomAnchor constant:15],
         [self.aimbotBtn.leadingAnchor constraintEqualToAnchor:self.card.leadingAnchor constant:15],
         [self.aimbotBtn.trailingAnchor constraintEqualToAnchor:self.card.trailingAnchor constant:-15],
         [self.aimbotBtn.heightAnchor constraintEqualToConstant:40],
 
-        // Slider FOV
         [fovTitle.topAnchor constraintEqualToAnchor:self.aimbotBtn.bottomAnchor constant:15],
         [fovTitle.leadingAnchor constraintEqualToAnchor:self.card.leadingAnchor constant:20],
 
@@ -124,7 +119,7 @@ static UIView *fovCircleView = nil;
         [self.fovSliderThumb.heightAnchor constraintEqualToConstant:12],
     ]];
 
-    // 5. CÍRCULO DE FOV (Fica no centro da tela, invisível por padrão)
+    // 5. CÍRCULO DE FOV
     fovCircleView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 200, 200)];
     fovCircleView.center = self.view.center;
     fovCircleView.backgroundColor = UIColor.clearColor;
@@ -139,16 +134,6 @@ static UIView *fovCircleView = nil;
     [fovCircleView.layer addSublayer:circleLayer];
 
     [self.view addSubview:fovCircleView];
-}
-
-// Libera o toque pra janela de baixo (deixa o jogo rodar normal)
-- (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
-    UIView *hitView = [super hitTest:point withEvent:event];
-    // Se o toque for fora do painel, ignora (passa pro jogo)
-    if (hitView == self.view) {
-        return nil; 
-    }
-    return hitView;
 }
 
 - (void)handlePan:(UIPanGestureRecognizer *)gesture {
@@ -175,6 +160,30 @@ static UIView *fovCircleView = nil;
 }
 @end
 
+// ==========================================
+// A MÁGICA PRA NÃO TRAVAR O JOGO
+// ==========================================
+// Criamos uma subclasse da UIWindow que só captura os toques se 
+// eles caírem DENTRO do painel. Se tocar fora, o toque vai pro Roblox.
+@interface PPOverlayWindowClass : UIWindow
+@property (nonatomic, weak) UIView *menuView;
+@end
+
+@implementation PPOverlayWindowClass
+
+- (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
+    UIView *hitView = [super hitTest:point withEvent:event];
+    
+    // Se o toque foi em cima do painel (menuView), deixa acontecer
+    if (self.menuView && CGRectContainsPoint(self.menuView.frame, point)) {
+        return hitView;
+    }
+    
+    // Se o toque foi no FOV ou fora do painel, passa pro jogo
+    return nil;
+}
+@end
+
 static void PPShowPanel(void) {
     dispatch_async(dispatch_get_main_queue(), ^{
         if (PPOverlayWindow && !PPOverlayWindow.hidden) return;
@@ -190,15 +199,17 @@ static void PPShowPanel(void) {
         if (!activeScene) return;
 
         if (!PPOverlayWindow) {
-            PPOverlayWindow = [[UIWindow alloc] initWithWindowScene:activeScene];
+            // Usa a nossa janela modificada
+            PPOverlayWindow = [[PPOverlayWindowClass alloc] initWithWindowScene:activeScene];
             PPOverlayWindow.frame = activeScene.coordinateSpace.bounds;
-            // MUDANÇA AQUI: Nível abaixo do alerta pra não travar o jogo
-            PPOverlayWindow.windowLevel = UIWindowLevelNormal + 1; 
+            PPOverlayWindow.windowLevel = UIWindowLevelNormal + 1;
             PPOverlayWindow.backgroundColor = UIColor.clearColor;
-            PPOverlayWindow.rootViewController = [PPPanelViewController new];
             
-            // Impede que a janela capture os toques gerais
-            PPOverlayWindow.userInteractionEnabled = YES;
+            PPPanelViewController *vc = [PPPanelViewController new];
+            PPOverlayWindow.rootViewController = vc;
+            
+            // Avisa a janela onde tá o painel
+            ((PPOverlayWindowClass *)PPOverlayWindow).menuView = vc.card;
         }
         PPOverlayWindow.hidden = NO;
         [PPOverlayWindow makeKeyAndVisible];
