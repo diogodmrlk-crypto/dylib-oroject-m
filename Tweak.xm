@@ -6,7 +6,7 @@ static UIWindow *PPOverlayWindow;
 static BOOL isAimbotEnabled = NO;
 static UIView *fovCircleView = nil;
 static float currentFov = 90.0f;
-static float currentSmooth = 5.0f; // Suavidade do Aimbot
+static float currentSmooth = 5.0f;
 
 // ==========================================
 // CLASSE DA JANELA (Toque e Rotação)
@@ -61,29 +61,27 @@ static float currentSmooth = 5.0f; // Suavidade do Aimbot
     CGFloat pW = 360.0;
     CGFloat pH = 260.0;
 
-    // 1. PAINEL PRINCIPAL (Estilo ImGui Escuro)
+    // 1. PAINEL PRINCIPAL
     self.mainPanel = [[UIView alloc] initWithFrame:CGRectMake(0, 0, pW, pH)];
     self.mainPanel.center = self.center;
-    self.mainPanel.backgroundColor = [UIColor colorWithRed:0.08 green:0.08 blue:0.10 alpha:0.98]; // Fundo escuro ImGui
+    self.mainPanel.backgroundColor = [UIColor colorWithRed:0.08 green:0.08 blue:0.10 alpha:0.98];
     self.mainPanel.layer.cornerRadius = 12;
     self.mainPanel.layer.borderWidth = 1.0;
-    self.mainPanel.layer.borderColor = [UIColor colorWithRed:0.85 green:0.1 blue:0.1 alpha:1].CGColor; // Borda Vermelha
+    self.mainPanel.layer.borderColor = [UIColor colorWithRed:0.85 green:0.1 blue:0.1 alpha:1].CGColor;
     self.mainPanel.clipsToBounds = YES;
     [self addSubview:self.mainPanel];
 
-    // 2. CABEÇALHO (Igual ao ImGui)
+    // 2. CABEÇALHO
     UIView *header = [[UIView alloc] initWithFrame:CGRectMake(0, 0, pW, 40)];
     header.backgroundColor = [UIColor colorWithRed:0.12 green:0.12 blue:0.15 alpha:1];
     [self.mainPanel addSubview:header];
 
-    // Título com Ícone
     UILabel *title = [[UILabel alloc] initWithFrame:CGRectMake(15, 0, pW - 50, 40)];
     title.text = @"🎯 PURPOU EXECUTOR";
-    title.textColor = [UIColor colorWithRed:0.9 green:0.2 blue:0.2 alpha:1]; // Vermelho claro
+    title.textColor = [UIColor colorWithRed:0.9 green:0.2 blue:0.2 alpha:1];
     title.font = [UIFont boldSystemFontOfSize:14];
     [header addSubview:title];
 
-    // Botão Fechar
     UIButton *closeBtn = [UIButton buttonWithType:UIButtonTypeSystem];
     closeBtn.frame = CGRectMake(pW - 40, 0, 40, 40);
     [closeBtn setTitle:@"✕" forState:UIControlStateNormal];
@@ -94,7 +92,7 @@ static float currentSmooth = 5.0f; // Suavidade do Aimbot
     UIPanGestureRecognizer *dragPan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePan:)];
     [header addGestureRecognizer:dragPan];
 
-    // 3. BARRA DE TABS ESQUERDA (Igual ao ImGui)
+    // 3. BARRA DE TABS ESQUERDA
     UIView *tabBar = [[UIView alloc] initWithFrame:CGRectMake(0, 40, 60, pH - 40)];
     tabBar.backgroundColor = [UIColor colorWithRed:0.06 green:0.06 blue:0.08 alpha:1];
     [self.mainPanel addSubview:tabBar];
@@ -106,12 +104,12 @@ static float currentSmooth = 5.0f; // Suavidade do Aimbot
     [tabBar addSubview:self.tabEsp];
     [tabBar addSubview:self.tabMisc];
 
-    // 4. CONTEÚDO DA ABA AIMBOT
+    // 4. CONTEÚDO DA ABA
     UIView *content = [[UIView alloc] initWithFrame:CGRectMake(70, 50, pW - 80, pH - 60)];
     content.backgroundColor = UIColor.clearColor;
     [self.mainPanel addSubview:content];
 
-    // Card do Aimbot (Botão Toggle)
+    // Card Aimbot
     self.aimbotCard = [[UIView alloc] initWithFrame:CGRectMake(0, 0, pW - 80, 45)];
     self.aimbotCard.backgroundColor = [UIColor colorWithRed:0.12 green:0.12 blue:0.15 alpha:1];
     self.aimbotCard.layer.cornerRadius = 8;
@@ -145,7 +143,7 @@ static float currentSmooth = 5.0f; // Suavidade do Aimbot
     [self.fovSlider addTarget:self action:@selector(fovChanged:) forControlEvents:UIControlEventValueChanged];
     [content addSubview:self.fovSlider];
 
-    // Slider Suavidade (Smooth)
+    // Slider Smooth
     self.smoothLabel = [[UILabel alloc] initWithFrame:CGRectMake(0, 120, 200, 20)];
     self.smoothLabel.text = @"Suavidade: 5.0";
     self.smoothLabel.textColor = [UIColor lightGrayColor];
@@ -184,7 +182,7 @@ static float currentSmooth = 5.0f; // Suavidade do Aimbot
     
     if (isAimbotEnabled) {
         fovCircleView.hidden = NO;
-        self.aimbotCard.backgroundColor = [UIColor colorWithRed:0.85 green:0.1 blue:0.1 alpha:0.2]; // Vermelho suave
+        self.aimbotCard.backgroundColor = [UIColor colorWithRed:0.85 green:0.1 blue:0.1 alpha:0.2];
     } else {
         fovCircleView.hidden = YES;
         self.aimbotCard.backgroundColor = [UIColor colorWithRed:0.12 green:0.12 blue:0.15 alpha:1];
@@ -195,7 +193,6 @@ static float currentSmooth = 5.0f; // Suavidade do Aimbot
     currentFov = sender.value;
     self.fovLabel.text = [NSString stringWithFormat:@"FOV: %.0f°", currentFov];
     
-    // Atualiza o desenho do círculo na tela
     if (fovCircleView) {
         CGFloat newSize = currentFov * 2.5f;
         fovCircleView.bounds = CGRectMake(0, 0, newSize, newSize);
@@ -216,38 +213,17 @@ static float currentSmooth = 5.0f; // Suavidade do Aimbot
 @end
 
 // ==========================================
-// LÓGICA DO AIMBOT (MATEMÁTICA)
+// LÓGICA DO AIMBOT
 // ==========================================
-// Hook para a câmera do Roblox
 static void (*orig_CameraUpdate)(void* self, void* method);
 static void new_CameraUpdate(void* self, void* method) {
     orig_CameraUpdate(self, method);
 
     if (isAimbotEnabled) {
-        // AQUI ENTRA A LÓGICA DO AIMBOT REAL
-        // Como a gente não tem os offsets, vamos simular o comportamento:
-        
-        // 1. Pega a tela central
-        CGPoint center = CGPointMake([UIScreen mainScreen].bounds.size.width / 2, [UIScreen mainScreen].bounds.size.height / 2);
-        
-        // 2. Lê a posição do toque na tela (se o jogador estiver mirando)
-        // 3. Calcula a diferença entre o toque e o centro
-        // 4. Aplica a rotação suavizada (smooth)
-        
-        // Nota: O código real precisa ler o `WorldToScreenPoint` do inimigo.
-        // Como isso exige engenharia reversa dos offsets do Roblox, 
-        // o código abaixo gira a câmera baseado no movimento.
+        // Aqui entra a matemática de puxar a mira
+        // (Requer os offsets da câmera do Roblox)
     }
 }
-
-%hook Camera
-- (void)Update {
-    %orig;
-    if (isAimbotEnabled) {
-        // Lógica pra puxar a mira (exemplo)
-    }
-}
-%end
 
 // ==========================================
 // CÍRCULO FOV
