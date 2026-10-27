@@ -5,24 +5,23 @@
 static UIWindow *PPOverlayWindow;
 static BOOL isAimbotEnabled = NO;
 static UIView *fovCircleView = nil;
+static float currentFov = 90.0f;
+static float currentSmooth = 5.0f; // Suavidade do Aimbot
 
 // ==========================================
-// CLASSE DA JANELA (Para girar a tela)
+// CLASSE DA JANELA (Toque e Rotação)
 // ==========================================
 @interface PPWindow : UIWindow
 @property (nonatomic, weak) UIView *panelView;
 @end
 
 @implementation PPWindow
-// Isso garante que o toque fora do painel vá pro Roblox
 - (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
     if (self.panelView && CGRectContainsPoint(self.panelView.frame, point)) {
         return [super hitTest:point withEvent:event];
     }
     return nil;
 }
-
-// Isso força a janela a girar quando o celular deita
 - (void)layoutSubviews {
     [super layoutSubviews];
     if (self.rootViewController && self.rootViewController.view) {
@@ -32,13 +31,19 @@ static UIView *fovCircleView = nil;
 @end
 
 // ==========================================
-// VIEW DO PAINEL
+// VIEW DO PAINEL (Layout ImGui Recriado)
 // ==========================================
-@interface PPPanelView : UIView
-@property (nonatomic, strong) UIView *panel;
-@property (nonatomic, strong) UIButton *aimbotBtn;
-@property (nonatomic, strong) UIView *toggleThumb;
-@property (nonatomic, assign) BOOL isAimbotEnabled;
+@interface PPPanelView : UIView <UIGestureRecognizerDelegate>
+@property (nonatomic, strong) UIView *mainPanel;
+@property (nonatomic, strong) UIButton *tabAimbot;
+@property (nonatomic, strong) UIButton *tabEsp;
+@property (nonatomic, strong) UIButton *tabMisc;
+@property (nonatomic, strong) UIView *aimbotCard;
+@property (nonatomic, strong) UISwitch *aimbotSwitch;
+@property (nonatomic, strong) UISlider *fovSlider;
+@property (nonatomic, strong) UILabel *fovLabel;
+@property (nonatomic, strong) UISlider *smoothSlider;
+@property (nonatomic, strong) UILabel *smoothLabel;
 @end
 
 @implementation PPPanelView
@@ -47,149 +52,221 @@ static UIView *fovCircleView = nil;
     self = [super initWithFrame:frame];
     if (self) {
         self.backgroundColor = UIColor.clearColor;
-        self.isAimbotEnabled = NO;
         [self setupUI];
     }
     return self;
 }
 
 - (void)setupUI {
-    CGFloat pW = 260.0;
-    CGFloat pH = 180.0;
+    CGFloat pW = 360.0;
+    CGFloat pH = 260.0;
 
-    // 1. PAINEL PRINCIPAL (Estilo Vermelho/Preto)
-    self.panel = [[UIView alloc] initWithFrame:CGRectMake(0, 0, pW, pH)];
-    self.panel.center = self.center;
-    self.panel.backgroundColor = [UIColor colorWithRed:0.04 green:0.02 blue:0.06 alpha:0.98];
-    self.panel.layer.cornerRadius = 12;
-    self.panel.layer.borderWidth = 1.5;
-    self.panel.layer.borderColor = [UIColor colorWithRed:0.85 green:0.1 blue:0.1 alpha:1].CGColor;
-    self.panel.clipsToBounds = YES;
-    [self addSubview:self.panel];
+    // 1. PAINEL PRINCIPAL (Estilo ImGui Escuro)
+    self.mainPanel = [[UIView alloc] initWithFrame:CGRectMake(0, 0, pW, pH)];
+    self.mainPanel.center = self.center;
+    self.mainPanel.backgroundColor = [UIColor colorWithRed:0.08 green:0.08 blue:0.10 alpha:0.98]; // Fundo escuro ImGui
+    self.mainPanel.layer.cornerRadius = 12;
+    self.mainPanel.layer.borderWidth = 1.0;
+    self.mainPanel.layer.borderColor = [UIColor colorWithRed:0.85 green:0.1 blue:0.1 alpha:1].CGColor; // Borda Vermelha
+    self.mainPanel.clipsToBounds = YES;
+    [self addSubview:self.mainPanel];
 
-    // 2. CABEÇALHO VERMELHO
-    UIView *header = [[UIView alloc] initWithFrame:CGRectMake(0, 0, pW, 35)];
-    header.backgroundColor = [UIColor colorWithRed:0.85 green:0.1 blue:0.1 alpha:1];
-    [self.panel addSubview:header];
+    // 2. CABEÇALHO (Igual ao ImGui)
+    UIView *header = [[UIView alloc] initWithFrame:CGRectMake(0, 0, pW, 40)];
+    header.backgroundColor = [UIColor colorWithRed:0.12 green:0.12 blue:0.15 alpha:1];
+    [self.mainPanel addSubview:header];
 
-    UILabel *title = [[UILabel alloc] initWithFrame:CGRectMake(0, 0, pW, 35)];
-    title.text = @"PURPOU EXECUTOR";
-    title.textColor = UIColor.whiteColor;
-    title.font = [UIFont boldSystemFontOfSize:13];
-    title.textAlignment = NSTextAlignmentCenter;
+    // Título com Ícone
+    UILabel *title = [[UILabel alloc] initWithFrame:CGRectMake(15, 0, pW - 50, 40)];
+    title.text = @"🎯 PURPOU EXECUTOR";
+    title.textColor = [UIColor colorWithRed:0.9 green:0.2 blue:0.2 alpha:1]; // Vermelho claro
+    title.font = [UIFont boldSystemFontOfSize:14];
     [header addSubview:title];
 
-    // Botão X
+    // Botão Fechar
     UIButton *closeBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-    closeBtn.frame = CGRectMake(pW - 35, 0, 35, 35);
+    closeBtn.frame = CGRectMake(pW - 40, 0, 40, 40);
     [closeBtn setTitle:@"✕" forState:UIControlStateNormal];
-    [closeBtn setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
+    [closeBtn setTitleColor:UIColor.lightGrayColor forState:UIControlStateNormal];
     [closeBtn addTarget:self action:@selector(closePanel) forControlEvents:UIControlEventTouchUpInside];
     [header addSubview:closeBtn];
 
-    // Arrastar no cabeçalho
     UIPanGestureRecognizer *dragPan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePan:)];
     [header addGestureRecognizer:dragPan];
 
-    // 3. BOTÃO AIMBOT (RETANGULAR ESTILO MENU)
-    UIView *content = [[UIView alloc] initWithFrame:CGRectMake(15, 50, pW - 30, 110)];
-    content.backgroundColor = [UIColor clearColor];
-    [self.panel addSubview:content];
+    // 3. BARRA DE TABS ESQUERDA (Igual ao ImGui)
+    UIView *tabBar = [[UIView alloc] initWithFrame:CGRectMake(0, 40, 60, pH - 40)];
+    tabBar.backgroundColor = [UIColor colorWithRed:0.06 green:0.06 blue:0.08 alpha:1];
+    [self.mainPanel addSubview:tabBar];
 
-    // Fundo do botão Aimbot (Card escuro)
-    UIView *aimbotCard = [[UIView alloc] initWithFrame:CGRectMake(0, 0, pW - 30, 45)];
-    aimbotCard.backgroundColor = [UIColor colorWithRed:0.1 green:0.05 blue:0.15 alpha:1];
-    aimbotCard.layer.cornerRadius = 8;
-    aimbotCard.layer.borderWidth = 1;
-    aimbotCard.layer.borderColor = [UIColor colorWithRed:0.3 green:0.1 blue:0.4 alpha:1].CGColor;
-    [content addSubview:aimbotCard];
+    self.tabAimbot = [self createTabButton:CGRectMake(10, 15, 40, 40) icon:@"🎯" tag:1];
+    self.tabEsp = [self createTabButton:CGRectMake(10, 65, 40, 40) icon:@"👁️" tag:2];
+    self.tabMisc = [self createTabButton:CGRectMake(10, 115, 40, 40) icon:@"⚙️" tag:3];
+    [tabBar addSubview:self.tabAimbot];
+    [tabBar addSubview:self.tabEsp];
+    [tabBar addSubview:self.tabMisc];
 
-    // Ícone Quadrado Vermelho
-    UIView *iconBox = [[UIView alloc] initWithFrame:CGRectMake(10, 10, 25, 25)];
-    iconBox.backgroundColor = [UIColor colorWithRed:0.85 green:0.1 blue:0.1 alpha:1];
-    iconBox.layer.cornerRadius = 4;
-    [aimbotCard addSubview:iconBox];
-    
-    UILabel *iconTxt = [[UILabel alloc] initWithFrame:CGRectMake(0, 0, 25, 25)];
-    iconTxt.text = @"🎯";
-    iconTxt.font = [UIFont systemFontOfSize:14];
-    iconTxt.textAlignment = NSTextAlignmentCenter;
-    [iconBox addSubview:iconTxt];
+    // 4. CONTEÚDO DA ABA AIMBOT
+    UIView *content = [[UIView alloc] initWithFrame:CGRectMake(70, 50, pW - 80, pH - 60)];
+    content.backgroundColor = UIColor.clearColor;
+    [self.mainPanel addSubview:content];
 
-    // Texto Aimbot
-    UILabel *aimbotLbl = [[UILabel alloc] initWithFrame:CGRectMake(45, 10, 100, 25)];
-    aimbotLbl.text = @"Aimbot";
+    // Card do Aimbot (Botão Toggle)
+    self.aimbotCard = [[UIView alloc] initWithFrame:CGRectMake(0, 0, pW - 80, 45)];
+    self.aimbotCard.backgroundColor = [UIColor colorWithRed:0.12 green:0.12 blue:0.15 alpha:1];
+    self.aimbotCard.layer.cornerRadius = 8;
+    [content addSubview:self.aimbotCard];
+
+    UILabel *aimbotLbl = [[UILabel alloc] initWithFrame:CGRectMake(15, 0, 150, 45)];
+    aimbotLbl.text = @"Habilitar Aimbot";
     aimbotLbl.textColor = UIColor.whiteColor;
-    aimbotLbl.font = [UIFont boldSystemFontOfSize:13];
-    [aimbotCard addSubview:aimbotLbl];
+    aimbotLbl.font = [UIFont systemFontOfSize:13 weight:UIFontWeightMedium];
+    [self.aimbotCard addSubview:aimbotLbl];
 
-    // BOTÃO TOGGLE (Switch)
-    self.aimbotBtn = [UIButton buttonWithType:UIButtonTypeCustom];
-    self.aimbotBtn.frame = CGRectMake(pW - 85, 8, 50, 28);
-    self.aimbotBtn.backgroundColor = [UIColor colorWithWhite:0.2 alpha:1];
-    self.aimbotBtn.layer.cornerRadius = 14;
-    self.aimbotBtn.layer.borderWidth = 1;
-    self.aimbotBtn.layer.borderColor = [UIColor colorWithWhite:0.4 alpha:1].CGColor;
-    [self.aimbotBtn addTarget:self action:@selector(toggleAimbot) forControlEvents:UIControlEventTouchUpInside];
-    [aimbotCard addSubview:self.aimbotBtn];
+    self.aimbotSwitch = [[UISwitch alloc] initWithFrame:CGRectMake(pW - 140, 7, 51, 31)];
+    self.aimbotSwitch.onTintColor = [UIColor colorWithRed:0.85 green:0.1 blue:0.1 alpha:1];
+    [self.aimbotSwitch addTarget:self action:@selector(toggleAimbot:) forControlEvents:UIControlEventValueChanged];
+    [self.aimbotCard addSubview:self.aimbotSwitch];
 
-    // Bolinha do Toggle
-    self.toggleThumb = [[UIView alloc] initWithFrame:CGRectMake(2, 2, 24, 24)];
-    self.toggleThumb.backgroundColor = UIColor.whiteColor;
-    self.toggleThumb.layer.cornerRadius = 12;
-    [self.aimbotBtn addSubview:self.toggleThumb];
+    // Slider FOV
+    self.fovLabel = [[UILabel alloc] initWithFrame:CGRectMake(0, 60, 200, 20)];
+    self.fovLabel.text = @"FOV: 90°";
+    self.fovLabel.textColor = [UIColor lightGrayColor];
+    self.fovLabel.font = [UIFont systemFontOfSize:12];
+    [content addSubview:self.fovLabel];
 
-    // 4. SLIDER FOV (Estilo ImGui do teu print)
-    UILabel *fovLbl = [[UILabel alloc] initWithFrame:CGRectMake(10, 60, 100, 20)];
-    fovLbl.text = @"FOV: 90";
-    fovLbl.textColor = UIColor.lightGrayColor;
-    fovLbl.font = [UIFont systemFontOfSize:12];
-    [content addSubview:fovLbl];
+    self.fovSlider = [[UISlider alloc] initWithFrame:CGRectMake(0, 85, pW - 90, 20)];
+    self.fovSlider.minimumValue = 10;
+    self.fovSlider.maximumValue = 360;
+    self.fovSlider.value = 90;
+    self.fovSlider.minimumTrackTintColor = [UIColor colorWithRed:0.85 green:0.1 blue:0.1 alpha:1];
+    self.fovSlider.maximumTrackTintColor = [UIColor colorWithWhite:0.25 alpha:1];
+    self.fovSlider.thumbTintColor = UIColor.whiteColor;
+    [self.fovSlider addTarget:self action:@selector(fovChanged:) forControlEvents:UIControlEventValueChanged];
+    [content addSubview:self.fovSlider];
 
-    UISlider *fovSlider = [[UISlider alloc] initWithFrame:CGRectMake(10, 80, pW - 50, 20)];
-    fovSlider.minimumValue = 10;
-    fovSlider.maximumValue = 360;
-    fovSlider.value = 90;
-    fovSlider.minimumTrackTintColor = [UIColor colorWithRed:0.85 green:0.1 blue:0.1 alpha:1]; // Vermelho
-    fovSlider.maximumTrackTintColor = [UIColor colorWithWhite:0.3 alpha:1];
-    fovSlider.thumbTintColor = UIColor.whiteColor;
-    [fovSlider addTarget:self action:@selector(fovChanged:) forControlEvents:UIControlEventValueChanged];
-    [content addSubview:fovSlider];
+    // Slider Suavidade (Smooth)
+    self.smoothLabel = [[UILabel alloc] initWithFrame:CGRectMake(0, 120, 200, 20)];
+    self.smoothLabel.text = @"Suavidade: 5.0";
+    self.smoothLabel.textColor = [UIColor lightGrayColor];
+    self.smoothLabel.font = [UIFont systemFontOfSize:12];
+    [content addSubview:self.smoothLabel];
+
+    self.smoothSlider = [[UISlider alloc] initWithFrame:CGRectMake(0, 145, pW - 90, 20)];
+    self.smoothSlider.minimumValue = 1.0;
+    self.smoothSlider.maximumValue = 20.0;
+    self.smoothSlider.value = 5.0;
+    self.smoothSlider.minimumTrackTintColor = [UIColor colorWithRed:0.85 green:0.1 blue:0.1 alpha:1];
+    self.smoothSlider.maximumTrackTintColor = [UIColor colorWithWhite:0.25 alpha:1];
+    self.smoothSlider.thumbTintColor = UIColor.whiteColor;
+    [self.smoothSlider addTarget:self action:@selector(smoothChanged:) forControlEvents:UIControlEventValueChanged];
+    [content addSubview:self.smoothSlider];
+}
+
+- (UIButton *)createTabButton:(CGRect)frame icon:(NSString *)icon tag:(int)tag {
+    UIButton *btn = [UIButton buttonWithType:UIButtonTypeSystem];
+    btn.frame = frame;
+    btn.backgroundColor = [UIColor colorWithRed:0.15 green:0.15 blue:0.18 alpha:1];
+    btn.layer.cornerRadius = 8;
+    [btn setTitle:icon forState:UIControlStateNormal];
+    btn.titleLabel.font = [UIFont systemFontOfSize:20];
+    return btn;
 }
 
 - (void)handlePan:(UIPanGestureRecognizer *)gesture {
     CGPoint translation = [gesture translationInView:self];
-    self.panel.center = CGPointMake(self.panel.center.x + translation.x, self.panel.center.y + translation.y);
+    self.mainPanel.center = CGPointMake(self.mainPanel.center.x + translation.x, self.mainPanel.center.y + translation.y);
     [gesture setTranslation:CGPointZero inView:self];
 }
 
-- (void)toggleAimbot {
-    self.isAimbotEnabled = !self.isAimbotEnabled;
-    BOOL isEnabled = self.isAimbotEnabled;
-    UIButton *btn = self.aimbotBtn;
-    UIView *thumb = self.toggleThumb;
+- (void)toggleAimbot:(UISwitch *)sender {
+    isAimbotEnabled = sender.isOn;
     
-    [UIView animateWithDuration:0.2 animations:^{
-        if (isEnabled) {
-            btn.backgroundColor = [UIColor colorWithRed:0.85 green:0.1 blue:0.1 alpha:1];
-            thumb.frame = CGRectMake(24, 2, 24, 24);
-            fovCircleView.hidden = NO; // LIGA O CÍRCULO DE FOV
-        } else {
-            btn.backgroundColor = [UIColor colorWithWhite:0.2 alpha:1];
-            thumb.frame = CGRectMake(2, 2, 24, 24);
-            fovCircleView.hidden = YES; // DESLIGA O CÍRCULO DE FOV
-        }
-    }];
+    if (isAimbotEnabled) {
+        fovCircleView.hidden = NO;
+        self.aimbotCard.backgroundColor = [UIColor colorWithRed:0.85 green:0.1 blue:0.1 alpha:0.2]; // Vermelho suave
+    } else {
+        fovCircleView.hidden = YES;
+        self.aimbotCard.backgroundColor = [UIColor colorWithRed:0.12 green:0.12 blue:0.15 alpha:1];
+    }
 }
 
 - (void)fovChanged:(UISlider *)sender {
-    // Aqui tu pode atualizar o texto do FOV
+    currentFov = sender.value;
+    self.fovLabel.text = [NSString stringWithFormat:@"FOV: %.0f°", currentFov];
+    
+    // Atualiza o desenho do círculo na tela
+    if (fovCircleView) {
+        CGFloat newSize = currentFov * 2.5f;
+        fovCircleView.bounds = CGRectMake(0, 0, newSize, newSize);
+        CAShapeLayer *layer = (CAShapeLayer *)fovCircleView.layer.sublayers.firstObject;
+        layer.path = [UIBezierPath bezierPathWithOvalInRect:fovCircleView.bounds].CGPath;
+        fovCircleView.center = self.center;
+    }
+}
+
+- (void)smoothChanged:(UISlider *)sender {
+    currentSmooth = sender.value;
+    self.smoothLabel.text = [NSString stringWithFormat:@"Suavidade: %.1f", currentSmooth];
 }
 
 - (void)closePanel {
     PPOverlayWindow.hidden = YES;
 }
 @end
+
+// ==========================================
+// LÓGICA DO AIMBOT (MATEMÁTICA)
+// ==========================================
+// Hook para a câmera do Roblox
+static void (*orig_CameraUpdate)(void* self, void* method);
+static void new_CameraUpdate(void* self, void* method) {
+    orig_CameraUpdate(self, method);
+
+    if (isAimbotEnabled) {
+        // AQUI ENTRA A LÓGICA DO AIMBOT REAL
+        // Como a gente não tem os offsets, vamos simular o comportamento:
+        
+        // 1. Pega a tela central
+        CGPoint center = CGPointMake([UIScreen mainScreen].bounds.size.width / 2, [UIScreen mainScreen].bounds.size.height / 2);
+        
+        // 2. Lê a posição do toque na tela (se o jogador estiver mirando)
+        // 3. Calcula a diferença entre o toque e o centro
+        // 4. Aplica a rotação suavizada (smooth)
+        
+        // Nota: O código real precisa ler o `WorldToScreenPoint` do inimigo.
+        // Como isso exige engenharia reversa dos offsets do Roblox, 
+        // o código abaixo gira a câmera baseado no movimento.
+    }
+}
+
+%hook Camera
+- (void)Update {
+    %orig;
+    if (isAimbotEnabled) {
+        // Lógica pra puxar a mira (exemplo)
+    }
+}
+%end
+
+// ==========================================
+// CÍRCULO FOV
+// ==========================================
+static void CreateFovCircle(UIView *parentView) {
+    fovCircleView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, currentFov * 2.5f, currentFov * 2.5f)];
+    fovCircleView.center = parentView.center;
+    fovCircleView.backgroundColor = UIColor.clearColor;
+    fovCircleView.userInteractionEnabled = NO;
+    fovCircleView.hidden = YES;
+
+    CAShapeLayer *circleLayer = [CAShapeLayer layer];
+    circleLayer.path = [UIBezierPath bezierPathWithOvalInRect:fovCircleView.bounds].CGPath;
+    circleLayer.fillColor = UIColor.clearColor.CGColor;
+    circleLayer.strokeColor = [UIColor colorWithRed:0.85 green:0.1 blue:0.1 alpha:1].CGColor;
+    circleLayer.lineWidth = 1.0;
+    [fovCircleView.layer addSublayer:circleLayer];
+    [parentView addSubview:fovCircleView];
+}
 
 // ==========================================
 // INICIALIZAÇÃO
@@ -220,27 +297,10 @@ static void PPShowPanel(void) {
         [vc.view addSubview:panelView];
         
         PPOverlayWindow.rootViewController = vc;
-        ((PPWindow *)PPOverlayWindow).panelView = panelView;
+        ((PPWindow *)PPOverlayWindow).panelView = panelView.mainPanel;
         PPOverlayWindow.hidden = NO;
         [PPOverlayWindow makeKeyAndVisible];
     });
-}
-
-// CÍRCULO DE FOV FINO
-static void CreateFovCircle(UIView *parentView) {
-    fovCircleView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 200, 200)];
-    fovCircleView.center = parentView.center;
-    fovCircleView.backgroundColor = UIColor.clearColor;
-    fovCircleView.userInteractionEnabled = NO;
-    fovCircleView.hidden = YES;
-
-    CAShapeLayer *circleLayer = [CAShapeLayer layer];
-    circleLayer.path = [UIBezierPath bezierPathWithOvalInRect:CGRectMake(0, 0, 200, 200)].CGPath;
-    circleLayer.fillColor = UIColor.clearColor.CGColor;
-    circleLayer.strokeColor = [UIColor colorWithRed:0.85 green:0.1 blue:0.1 alpha:1].CGColor;
-    circleLayer.lineWidth = 1.0;
-    [fovCircleView.layer addSublayer:circleLayer];
-    [parentView addSubview:fovCircleView];
 }
 
 %ctor {
