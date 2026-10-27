@@ -3,7 +3,6 @@
 #import <QuartzCore/QuartzCore.h>
 
 static UIWindow *PPOverlayWindow;
-static BOOL isAimbotEnabled = NO;
 
 // ==========================================
 // CLASSE DA JANELA (Para não travar o jogo)
@@ -25,6 +24,7 @@ static BOOL isAimbotEnabled = NO;
 @property (nonatomic, strong) UIView *panel;
 @property (nonatomic, strong) UIView *header;
 @property (nonatomic, strong) UIButton *aimbotBtn;
+@property (nonatomic, assign) BOOL isAimbotEnabled; // AGORA É UMA PROPERTY
 @end
 
 @implementation PPPanelView
@@ -33,6 +33,7 @@ static BOOL isAimbotEnabled = NO;
     self = [super initWithFrame:frame];
     if (self) {
         self.backgroundColor = UIColor.clearColor;
+        self.isAimbotEnabled = NO;
         [self setupUI];
     }
     return self;
@@ -119,8 +120,6 @@ static BOOL isAimbotEnabled = NO;
 // Lógica pra arrastar o painel
 - (void)handlePan:(UIPanGestureRecognizer *)gesture {
     CGPoint translation = [gesture translationInView:self];
-    
-    // Move o painel
     gesture.view.center = CGPointMake(gesture.view.center.x + translation.x,
                                       gesture.view.center.y + translation.y);
     [gesture setTranslation:CGPointZero inView:self];
@@ -128,17 +127,21 @@ static BOOL isAimbotEnabled = NO;
 
 // Lógica do botão Aimbot
 - (void)toggleAimbot {
-    isAimbotEnabled = !isAimbotEnabled;
+    self.isAimbotEnabled = !self.isAimbotEnabled;
     UIView *thumb = [self.aimbotBtn viewWithTag:101];
     
+    // Guardando o estado numa variável local para não bugar o bloco de animação
+    BOOL isEnabled = self.isAimbotEnabled;
+    UIButton *btn = self.aimbotBtn;
+    
     [UIView animateWithDuration:0.2 animations:^{
-        if (self->isAimbotEnabled) { // Usando self-> por causa do bloco de animação
-            self.aimbotBtn.backgroundColor = [UIColor colorWithRed:0.9 green:0.1 blue:0.1 alpha:1];
-            self.aimbotBtn.layer.borderColor = [UIColor colorWithRed:0.9 green:0.1 blue:0.1 alpha:1].CGColor;
+        if (isEnabled) {
+            btn.backgroundColor = [UIColor colorWithRed:0.9 green:0.1 blue:0.1 alpha:1];
+            btn.layer.borderColor = [UIColor colorWithRed:0.9 green:0.1 blue:0.1 alpha:1].CGColor;
             thumb.frame = CGRectMake(26, 2, 22, 22);
         } else {
-            self.aimbotBtn.backgroundColor = [UIColor colorWithWhite:0.2 alpha:1];
-            self.aimbotBtn.layer.borderColor = [UIColor colorWithWhite:0.4 alpha:1].CGColor;
+            btn.backgroundColor = [UIColor colorWithWhite:0.2 alpha:1];
+            btn.layer.borderColor = [UIColor colorWithWhite:0.4 alpha:1].CGColor;
             thumb.frame = CGRectMake(2, 2, 22, 22);
         }
     }];
@@ -167,13 +170,11 @@ static void PPShowPanel(void) {
         if (!activeScene) return;
 
         if (!PPOverlayWindow) {
-            // Usa a PPWindow que não bloqueia o toque
             PPOverlayWindow = [[PPWindow alloc] initWithWindowScene:activeScene];
             PPOverlayWindow.frame = activeScene.coordinateSpace.bounds;
             PPOverlayWindow.windowLevel = UIWindowLevelStatusBar + 1;
             PPOverlayWindow.backgroundColor = UIColor.clearColor;
             
-            // O Controller é vazio, a View faz tudo
             UIViewController *vc = [UIViewController new];
             vc.view.backgroundColor = UIColor.clearColor;
             
@@ -183,7 +184,6 @@ static void PPShowPanel(void) {
             PPOverlayWindow.rootViewController = vc;
         }
         PPOverlayWindow.hidden = NO;
-        // REMOVIDO o makeKeyAndVisible() que travava o jogo
     });
 }
 
