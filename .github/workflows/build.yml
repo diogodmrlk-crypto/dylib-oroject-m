@@ -1,38 +1,66 @@
+
 name: Build PurpouPanel
 
 on:
   workflow_dispatch:
   push:
-    branches: [ main ]
+    branches:
+      - html-to-ts-generator
+
+permissions:
+  contents: read
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    name: Compilar dylib
+    runs-on: ubuntu-22.04
+
     steps:
-      - name: Baixar projeto
+      - name: Baixar o projeto
         uses: actions/checkout@v4
+
+      - name: Atualizar pacotes do Ubuntu
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            fakeroot \
+            rsync \
+            curl \
+            perl \
+            zip \
+            git \
+            libxml2 \
+            libtinfo6 \
+            libz3-dev \
+            libplist-utils
 
       - name: Preparar Theos
         uses: Randomblock1/theos-action@v1
 
-      - name: Compilar pacote
-        run: make package FINALPACKAGE=1
-
-      - name: Extrair a dylib do pacote
+      - name: Compilar projeto
         run: |
-          set -e
+          make package FINALPACKAGE=1
+
+      - name: Extrair a biblioteca
+        run: |
+          set -eu
           mkdir -p dist/unpacked
-          DEB="$(find packages -maxdepth 1 -type f -name '*.deb' | head -n 1)"
+
+          DEB="$(find packages -type f -name '*.deb' | head -n 1)"
           test -n "$DEB"
+
           dpkg-deb -x "$DEB" dist/unpacked
+
           DYLIB="$(find dist/unpacked -type f -name 'PurpouPanel.dylib' | head -n 1)"
           test -n "$DYLIB"
+
           cp "$DYLIB" dist/PurpouPanel.dylib
           cp "$DEB" dist/PurpouPanel.deb
 
-      - name: Disponibilizar arquivos para baixar
+      - name: Disponibilizar arquivos
         uses: actions/upload-artifact@v4
         with:
           name: PurpouPanel-build
-          path: dist/*
+          path: dist/PurpouPanel.*
           if-no-files-found: error
