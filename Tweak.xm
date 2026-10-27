@@ -3,17 +3,23 @@
 #import <QuartzCore/QuartzCore.h>
 
 static UIWindow *PPOverlayWindow;
+static UIView *PPGlobalPanelView = nil;
 
 // ==========================================
-// CLASSE DA JANELA (Para não travar o jogo)
+// CLASSE DA JANELA (Toques corrigidos)
 // ==========================================
 @interface PPWindow : UIWindow
+@property (nonatomic, weak) UIView *panelView;
 @end
 
 @implementation PPWindow
-// Isso garante que a janela não crie uma barreira invisível no jogo
-- (BOOL)pointInside:(CGPoint)point withEvent:(UIEvent *)event {
-    return NO; 
+
+// Só bloqueia o toque se ele NÃO estiver dentro do painel
+- (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
+    if (self.panelView && CGRectContainsPoint(self.panelView.frame, point)) {
+        return [super hitTest:point withEvent:event]; // Toque no painel
+    }
+    return nil; // Toque no jogo
 }
 @end
 
@@ -24,7 +30,7 @@ static UIWindow *PPOverlayWindow;
 @property (nonatomic, strong) UIView *panel;
 @property (nonatomic, strong) UIView *header;
 @property (nonatomic, strong) UIButton *aimbotBtn;
-@property (nonatomic, assign) BOOL isAimbotEnabled; // AGORA É UMA PROPERTY
+@property (nonatomic, assign) BOOL isAimbotEnabled;
 @end
 
 @implementation PPPanelView
@@ -40,97 +46,101 @@ static UIWindow *PPOverlayWindow;
 }
 
 - (void)setupUI {
-    // 1. O PAINEL PRINCIPAL
-    self.panel = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 260, 140)];
+    // Tamanho maior pra ficar igual ao print (340x180)
+    CGFloat pW = 340.0;
+    CGFloat pH = 180.0;
+
+    // 1. PAINEL PRINCIPAL
+    self.panel = [[UIView alloc] initWithFrame:CGRectMake(0, 0, pW, pH)];
     self.panel.center = self.center;
-    self.panel.backgroundColor = [UIColor colorWithRed:0.02 green:0.02 blue:0.02 alpha:0.95];
-    self.panel.layer.cornerRadius = 8;
-    self.panel.layer.borderWidth = 1.5;
+    self.panel.backgroundColor = [UIColor colorWithRed:0.01 green:0.01 blue:0.01 alpha:0.98];
+    self.panel.layer.cornerRadius = 4;
+    self.panel.layer.borderWidth = 2.0;
     self.panel.layer.borderColor = [UIColor colorWithRed:0.9 green:0.1 blue:0.1 alpha:1].CGColor;
     self.panel.clipsToBounds = YES;
     [self addSubview:self.panel];
 
-    // Gesto de arrastar SÓ no cabeçalho
+    // Gesto de arrastar
     UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePan:)];
-    [self.panel addGestureRecognizer:pan];
+    [self.header addGestureRecognizer:pan]; // Adicionado depois que header for criado
 
     // 2. CABEÇALHO VERMELHO
-    self.header = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 260, 30)];
+    self.header = [[UIView alloc] initWithFrame:CGRectMake(0, 0, pW, 35)];
     self.header.backgroundColor = [UIColor colorWithRed:0.9 green:0.1 blue:0.1 alpha:1];
     [self.panel addSubview:self.header];
 
-    // Título do Cabeçalho
-    UILabel *title = [[UILabel alloc] initWithFrame:CGRectMake(30, 0, 200, 30)];
+    // Título
+    UILabel *title = [[UILabel alloc] initWithFrame:CGRectMake(0, 0, pW, 35)];
     title.text = @"PURPOU EXECUTOR";
     title.textColor = UIColor.whiteColor;
-    title.font = [UIFont boldSystemFontOfSize:11];
+    title.font = [UIFont boldSystemFontOfSize:14];
     title.textAlignment = NSTextAlignmentCenter;
     [self.header addSubview:title];
 
     // Botão X
     UIButton *closeBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-    closeBtn.frame = CGRectMake(230, 0, 30, 30);
+    closeBtn.frame = CGRectMake(pW - 35, 0, 35, 35);
     [closeBtn setTitle:@"✕" forState:UIControlStateNormal];
     [closeBtn setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
     [closeBtn addTarget:self action:@selector(closePanel) forControlEvents:UIControlEventTouchUpInside];
     [self.header addSubview:closeBtn];
 
-    // 3. CONTAINER DA TOGGLE
-    UIView *content = [[UIView alloc] initWithFrame:CGRectMake(10, 40, 240, 80)];
+    // Adiciona o pan no header que agora existe
+    UIPanGestureRecognizer *dragPan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePan:)];
+    [self.header addGestureRecognizer:dragPan];
+
+    // 3. CONTAINER DO CONTEÚDO
+    UIView *content = [[UIView alloc] initWithFrame:CGRectMake(15, 50, pW - 30, 100)];
     content.backgroundColor = [UIColor clearColor];
     [self.panel addSubview:content];
 
-    // Ícone Quadrado Vermelho (Esquerda)
-    UIView *iconBox = [[UIView alloc] initWithFrame:CGRectMake(0, 10, 30, 30)];
+    // Ícone Quadrado Vermelho
+    UIView *iconBox = [[UIView alloc] initWithFrame:CGRectMake(0, 15, 40, 40)];
     iconBox.backgroundColor = [UIColor colorWithRed:0.9 green:0.1 blue:0.1 alpha:1];
-    iconBox.layer.cornerRadius = 4;
+    iconBox.layer.cornerRadius = 6;
     [content addSubview:iconBox];
     
-    UILabel *iconTxt = [[UILabel alloc] initWithFrame:CGRectMake(0, 0, 30, 30)];
+    UILabel *iconTxt = [[UILabel alloc] initWithFrame:CGRectMake(0, 0, 40, 40)];
     iconTxt.text = @"🎯";
-    iconTxt.font = [UIFont systemFontOfSize:14];
+    iconTxt.font = [UIFont systemFontOfSize:20];
     iconTxt.textAlignment = NSTextAlignmentCenter;
     [iconBox addSubview:iconTxt];
 
-    // Texto "Aimbot"
-    UILabel *aimbotLbl = [[UILabel alloc] initWithFrame:CGRectMake(50, 10, 100, 30)];
+    // Texto Aimbot
+    UILabel *aimbotLbl = [[UILabel alloc] initWithFrame:CGRectMake(60, 15, 120, 40)];
     aimbotLbl.text = @"Aimbot";
     aimbotLbl.textColor = UIColor.whiteColor;
-    aimbotLbl.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
+    aimbotLbl.font = [UIFont systemFontOfSize:16 weight:UIFontWeightMedium];
     [content addSubview:aimbotLbl];
 
-    // BOTÃO TOGGLE (Falso Switch)
+    // BOTÃO TOGGLE
     self.aimbotBtn = [UIButton buttonWithType:UIButtonTypeCustom];
-    self.aimbotBtn.frame = CGRectMake(180, 12, 50, 26);
+    self.aimbotBtn.frame = CGRectMake(pW - 90, 22, 60, 30);
     self.aimbotBtn.backgroundColor = [UIColor colorWithWhite:0.2 alpha:1];
-    self.aimbotBtn.layer.cornerRadius = 13;
+    self.aimbotBtn.layer.cornerRadius = 15;
     self.aimbotBtn.layer.borderWidth = 1;
     self.aimbotBtn.layer.borderColor = [UIColor colorWithWhite:0.4 alpha:1].CGColor;
     [self.aimbotBtn addTarget:self action:@selector(toggleAimbot) forControlEvents:UIControlEventTouchUpInside];
     [content addSubview:self.aimbotBtn];
 
     // Bolinha do Toggle
-    UIView *thumb = [[UIView alloc] initWithFrame:CGRectMake(2, 2, 22, 22)];
+    UIView *thumb = [[UIView alloc] initWithFrame:CGRectMake(3, 3, 24, 24)];
     thumb.backgroundColor = UIColor.whiteColor;
-    thumb.layer.cornerRadius = 11;
-    thumb.tag = 101; // Tag pra achar depois
+    thumb.layer.cornerRadius = 12;
+    thumb.tag = 101;
     [self.aimbotBtn addSubview:thumb];
 }
 
-// Lógica pra arrastar o painel
 - (void)handlePan:(UIPanGestureRecognizer *)gesture {
     CGPoint translation = [gesture translationInView:self];
-    gesture.view.center = CGPointMake(gesture.view.center.x + translation.x,
-                                      gesture.view.center.y + translation.y);
+    self.panel.center = CGPointMake(self.panel.center.x + translation.x, self.panel.center.y + translation.y);
     [gesture setTranslation:CGPointZero inView:self];
 }
 
-// Lógica do botão Aimbot
 - (void)toggleAimbot {
     self.isAimbotEnabled = !self.isAimbotEnabled;
     UIView *thumb = [self.aimbotBtn viewWithTag:101];
     
-    // Guardando o estado numa variável local para não bugar o bloco de animação
     BOOL isEnabled = self.isAimbotEnabled;
     UIButton *btn = self.aimbotBtn;
     
@@ -138,17 +148,45 @@ static UIWindow *PPOverlayWindow;
         if (isEnabled) {
             btn.backgroundColor = [UIColor colorWithRed:0.9 green:0.1 blue:0.1 alpha:1];
             btn.layer.borderColor = [UIColor colorWithRed:0.9 green:0.1 blue:0.1 alpha:1].CGColor;
-            thumb.frame = CGRectMake(26, 2, 22, 22);
+            thumb.frame = CGRectMake(33, 3, 24, 24);
         } else {
             btn.backgroundColor = [UIColor colorWithWhite:0.2 alpha:1];
             btn.layer.borderColor = [UIColor colorWithWhite:0.4 alpha:1].CGColor;
-            thumb.frame = CGRectMake(2, 2, 22, 22);
+            thumb.frame = CGRectMake(3, 3, 24, 24);
         }
     }];
 }
 
 - (void)closePanel {
-    PPOverlayWindow.hidden = YES;
+    self.hidden = YES;
+}
+@end
+
+// ==========================================
+// LÓGICA DOS 3 DEDOS
+// ==========================================
+@interface PPTouchTrigger : NSObject
+@end
+@implementation PPTouchTrigger
++ (void)setup {
+    // Escuta o toque na janela principal
+    UIWindow *mainWin = UIApplication.sharedApplication.windows.firstObject;
+    if (!mainWin) return;
+    
+    UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(triggered)];
+    tap.numberOfTouchesRequired = 3;
+    tap.numberOfTapsRequired = 1;
+    [mainWin addGestureRecognizer:tap];
+}
+
++ (void)triggered {
+    if (!PPOverlayWindow) {
+        PPShowPanel();
+    }
+    PPOverlayWindow.hidden = !PPOverlayWindow.hidden;
+    if (!PPOverlayWindow.hidden) {
+        [PPOverlayWindow makeKeyAndVisible];
+    }
 }
 @end
 
@@ -157,7 +195,7 @@ static UIWindow *PPOverlayWindow;
 // ==========================================
 static void PPShowPanel(void) {
     dispatch_async(dispatch_get_main_queue(), ^{
-        if (PPOverlayWindow && !PPOverlayWindow.hidden) return;
+        if (PPOverlayWindow) return;
 
         UIWindowScene *activeScene = nil;
         for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
@@ -169,21 +207,23 @@ static void PPShowPanel(void) {
         }
         if (!activeScene) return;
 
-        if (!PPOverlayWindow) {
-            PPOverlayWindow = [[PPWindow alloc] initWithWindowScene:activeScene];
-            PPOverlayWindow.frame = activeScene.coordinateSpace.bounds;
-            PPOverlayWindow.windowLevel = UIWindowLevelStatusBar + 1;
-            PPOverlayWindow.backgroundColor = UIColor.clearColor;
-            
-            UIViewController *vc = [UIViewController new];
-            vc.view.backgroundColor = UIColor.clearColor;
-            
-            PPPanelView *panelView = [[PPPanelView alloc] initWithFrame:activeScene.coordinateSpace.bounds];
-            [vc.view addSubview:panelView];
-            
-            PPOverlayWindow.rootViewController = vc;
-        }
+        PPOverlayWindow = [[PPWindow alloc] initWithWindowScene:activeScene];
+        PPOverlayWindow.frame = activeScene.coordinateSpace.bounds;
+        PPOverlayWindow.windowLevel = UIWindowLevelStatusBar + 1;
+        PPOverlayWindow.backgroundColor = UIColor.clearColor;
+        
+        UIViewController *vc = [UIViewController new];
+        vc.view.backgroundColor = UIColor.clearColor;
+        
+        PPPanelView *panelView = [[PPPanelView alloc] initWithFrame:activeScene.coordinateSpace.bounds];
+        [vc.view addSubview:panelView];
+        
+        PPOverlayWindow.rootViewController = vc;
+        ((PPWindow *)PPOverlayWindow).panelView = panelView.panel;
+        PPGlobalPanelView = panelView;
+
         PPOverlayWindow.hidden = NO;
+        [PPOverlayWindow makeKeyAndVisible];
     });
 }
 
@@ -193,7 +233,10 @@ static void PPShowPanel(void) {
             object:nil queue:[NSOperationQueue mainQueue]
             usingBlock:^(__unused NSNotification *notification) {
                 dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)),
-                    dispatch_get_main_queue(), ^{ PPShowPanel(); });
+                    dispatch_get_main_queue(), ^{ 
+                        PPShowPanel();
+                        [PPTouchTrigger setup];
+                    });
             }];
     }
 }
